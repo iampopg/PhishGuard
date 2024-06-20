@@ -3,11 +3,11 @@ import email
 import hashlib
 import socket
 import file_hash_analysis
-
+from cred import *
 # IMAP server credentials
-IMAP_SERVER = 'imap.gmail.com'
-USERNAME = 'cailbank.mail@gmail.com'
-PASSWORD = 'zoqyzbftcccgjogl'
+IMAP_SERVER = IMAP_SERVER
+USERNAME = USERNAME
+PASSWORD = PASSWORD
 
 def resolve_ip(domain):
     """Resolve IP address from domain."""
@@ -99,7 +99,7 @@ def load_processed_ids(filename):
         return set()
 
 def main():
-    api_key = "ad404788720b87bc5a826648b0321313c92c8109e3e527a4ed4b5e92ec13a077"
+    api_key = vt_api_key
     processed_ids = load_processed_ids('processed_ids.txt')
 
     mail = imaplib.IMAP4_SSL(IMAP_SERVER)
