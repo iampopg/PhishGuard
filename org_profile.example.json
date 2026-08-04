@@ -1,0 +1,7 @@
+{
+  "protected_domains": ["yourcompany.com"],
+  "brand_domains": ["paypal.com", "microsoft.com", "apple.com", "amazon.com"],
+  "brand_keywords": ["paypal", "microsoft", "apple", "amazon"],
+  "trusted_domains": ["yourcompany.com", "partner.com"],
+  "vip_names": ["ceo", "cfo", "finance"]
+}

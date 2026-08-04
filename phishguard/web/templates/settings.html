@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h2>Settings</h2>
+<p class="muted">All engine configuration. Saved values are written to <code>.env</code> and apply immediately.</p>
+<form method="post" class="card">
+  {% macro text(k, label) %}<label>{{ label }}</label><input type="text" name="{{ k }}" value="{{ env.get(k,'') }}">{% endmacro %}
+  {% macro num(k, label) %}<label>{{ label }}</label><input type="number" name="{{ k }}" value="{{ env.get(k,'') }}">{% endmacro %}
+  {% macro pw(k, label) %}<label>{{ label }}</label><input type="password" name="{{ k }}" value="{{ env.get(k,'') }}">{% endmacro %}
+  {% macro chk(k, label) %}<label><input type="checkbox" name="{{ k }}" {% if env.get(k,'false')=='true' %}checked{% endif %}> {{ label }}</label>{% endmacro %}
+
+  <h3>Mailbox</h3>
+  <div class="row">
+    <div>{{ text('PG_IMAP_SERVER','IMAP server') }}</div>
+    <div>{{ text('PG_IMAP_USERNAME','Username') }}</div>
+    <div>{{ pw('PG_IMAP_PASSWORD','Password') }}</div>
+  </div>
+  <div class="row">
+    <div>{{ text('PG_IMAP_MAILBOX','Mailbox') }}</div>
+    <div>{{ num('PG_IMAP_PORT','Port') }}</div>
+    <div>{{ num('PG_IMAP_TIMEOUT','Timeout (s)') }}</div>
+  </div>
+  {{ chk('PG_IMAP_USE_SSL','Use SSL') }} {{ chk('PG_IMAP_UNSEEN_ONLY','Unseen only') }} {{ chk('PG_IMAP_MARK_READ','Mark read after scan') }}
+
+  <h3>Enrichment</h3>
+  <div class="row">
+    <div>{{ pw('PG_VT_API_KEY','VirusTotal API key') }}</div>
+    <div>{{ pw('PG_GSB_API_KEY','Google Safe Browsing key') }}</div>
+  </div>
+  {{ chk('PG_VT_ENABLED','VirusTotal enabled') }} {{ chk('PG_GSB_ENABLED','Google Safe Browsing enabled') }}
+
+  <h3>Sandbox / AV</h3>
+  <div class="row">
+    <div>{{ text('PG_CLAMAV_HOST','ClamAV host') }}</div>
+    <div>{{ num('PG_CLAMAV_PORT','ClamAV port') }}</div>
+  </div>
+  {{ chk('PG_CLAMAV_ENABLED','ClamAV enabled') }} {{ chk('PG_SANDBOX_ENABLED','Sandbox enabled') }}
+  <div class="row">
+    <div>{{ text('PG_SANDBOX_PROVIDER','Sandbox provider') }}</div>
+    <div>{{ pw('PG_SANDBOX_API_KEY','Sandbox API key') }}</div>
+    <div>{{ text('PG_SANDBOX_URL','Sandbox URL') }}</div>
+  </div>
+
+  <h3>Monitor & Behavioral</h3>
+  {{ chk('PG_MONITOR_ENABLED','Monitor enabled') }} {{ num('PG_MONITOR_INTERVAL','Monitor interval (s)') }}
+  <br>{{ chk('PG_BEHAVIORAL_ENABLED','Behavioral BEC enabled') }} {{ num('PG_BEHAVIORAL_BASELINE_DAYS','Baseline days') }}
+
+  <h3>Engine</h3>
+  <div class="row">
+    <div>{{ num('PG_THRESHOLD_SUSPICIOUS','Threshold: suspicious') }}</div>
+    <div>{{ num('PG_THRESHOLD_PHISHING','Threshold: phishing') }}</div>
+    <div>{{ num('PG_THRESHOLD_MALICIOUS','Threshold: malicious') }}</div>
+  </div>
+  {{ chk('PG_DNS_CHECKS_ENABLED','DNS checks (DMARC presence)') }}
+  <label>Trusted domains (comma-separated)</label><input type="text" name="PG_TRUSTED_DOMAINS" value="{{ env.get('PG_TRUSTED_DOMAINS','') }}">
+  <label>Log level</label>
+  <select name="PG_LOG_LEVEL">
+    {% for l in ['DEBUG','INFO','WARNING','ERROR'] %}<option value="{{ l }}" {% if env.get('PG_LOG_LEVEL','INFO')==l %}selected{% endif %}>{{ l }}</option>{% endfor %}
+  </select>
+
+  <h3>Web & Storage</h3>
+  <div class="row">
+    <div>{{ text('PG_WEB_HOST','Web host') }}</div>
+    <div>{{ num('PG_WEB_PORT','Web port') }}</div>
+    <div>{{ text('PG_WEB_USERNAME','Web username') }}</div>
+  </div>
+  <div class="row">
+    <div>{{ pw('PG_WEB_PASSWORD','Web password') }}</div>
+    <div>{{ pw('PG_WEB_SECRET_KEY','Web secret key') }}</div>
+    <div>{{ text('PG_REPORT_DIR','Report dir') }}</div>
+  </div>
+  <label>Org profile path</label><input type="text" name="PG_ORG_PROFILE_PATH" value="{{ env.get('PG_ORG_PROFILE_PATH','org_profile.json') }}">
+
+  <p><button type="submit">Save settings</button></p>
+</form>
+{% endblock %}

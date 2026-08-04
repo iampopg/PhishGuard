@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Scan{% endblock %}
+{% block content %}
+<h2>Scan a message</h2>
+<form method="post" enctype="multipart/form-data" class="card">
+  <label>Upload .eml file</label>
+  <input type="file" name="eml">
+  <label>Or paste email/text</label>
+  <textarea name="text" rows="8" placeholder="paste raw message or body text"></textarea>
+  <label>Or scan a single URL</label>
+  <input type="text" name="url" placeholder="https://example.com">
+  <p><button type="submit">Analyze</button></p>
+</form>
+{% if result_html %}<h3>Result</h3>{{ result_html }}{% endif %}
+{% endblock %}

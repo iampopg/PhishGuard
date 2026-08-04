@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhishGuard — {% block title %}Console{% endblock %}</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#0f172a; color:#e2e8f0; }
+  header { background:#111827; padding:10px 18px; border-bottom:1px solid #1f2937; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  header a { color:#cbd5e1; text-decoration:none; font-size:14px; padding:4px 8px; border-radius:6px; }
+  header a:hover { background:#1f2937; color:#fff; }
+  header .brand { color:#38bdf8; font-weight:700; margin-right:8px; }
+  header .right { margin-left:auto; color:#94a3b8; font-size:13px; }
+  .wrap { padding:18px; max-width:1100px; margin:auto; }
+  h1,h2,h3 { font-weight:600; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th,td { text-align:left; padding:7px 8px; border-bottom:1px solid #1f2937; font-size:14px; }
+  .badge { padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
+  .safe{background:#064e3b;color:#6ee7b7;} .suspicious{background:#713f12;color:#fde68a;}
+  .phishing{background:#7c2d12;color:#fdba74;} .malicious{background:#7f1d1d;color:#fca5a5;}
+  .card { background:#111827; border:1px solid #1f2937; border-radius:8px; padding:14px; margin-top:12px; }
+  label { display:block; margin:8px 0 3px; font-size:13px; color:#94a3b8; }
+  input[type=text], input[type=password], input[type=number], textarea, select {
+    width:100%; background:#0f172a; color:#e2e8f0; border:1px solid #334155; padding:7px; border-radius:6px; box-sizing:border-box; font-size:14px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:220px; }
+  button, .btn { background:#0ea5e9; color:#04121f; border:0; padding:8px 14px; border-radius:6px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-block; }
+  .btn.sec { background:#334155; color:#e2e8f0; }
+  .flash { background:#1e3a8a; color:#dbeafe; padding:8px 12px; border-radius:6px; margin:10px 0; font-size:14px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; }
+  .stat { background:#111827; border:1px solid #1f2937; border-radius:8px; padding:12px 16px; min-width:120px; }
+  .stat b { font-size:22px; display:block; }
+  .muted { color:#94a3b8; font-size:13px; }
+  code { background:#0f172a; padding:1px 4px; border-radius:4px; }
+  ul.findings { font-size:13px; }
+  ul.findings li { margin-bottom:4px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">PhishGuard</span>
+  <a href="/">Dashboard</a>
+  <a href="/reports">Reports</a>
+  <a href="/scan">Scan</a>
+  <a href="/mailbox">Mailbox</a>
+  <a href="/feeds">Feeds</a>
+  <a href="/org">Org Profile</a>
+  <a href="/rules">Rules</a>
+  <a href="/remediation">Remediation</a>
+  <a href="/export">Export</a>
+  <a href="/settings">Settings</a>
+  <span class="right"><a href="/logout">Logout</a></span>
+</header>
+<div class="wrap">
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Org Profile{% endblock %}
+{% block content %}
+<h2>Organization profile</h2>
+<p class="muted">Saved to <code>{{ path }}</code>. Used for lookalike / brand-impersonation / VIP detection.</p>
+<form method="post" class="card">
+  <label>Protected domains (your org, comma-separated)</label>
+  <textarea name="protected_domains">{{ org.protected_domains | join(", ") }}</textarea>
+  <label>Brand domains to protect (e.g. paypal.com)</label>
+  <textarea name="brand_domains">{{ org.brand_domains | join(", ") }}</textarea>
+  <label>Brand keywords (display-name cues)</label>
+  <textarea name="brand_keywords">{{ org.brand_keywords | join(", ") }}</textarea>
+  <label>VIP names (internal people impersonated in BEC)</label>
+  <textarea name="vip_names">{{ org.vip_names | join(", ") }}</textarea>
+  <label>Trusted domains (lower scrutiny)</label>
+  <textarea name="trusted_domains">{{ org.trusted_domains | join(", ") }}</textarea>
+  <p><button type="submit">Save profile</button></p>
+</form>
+{% endblock %}

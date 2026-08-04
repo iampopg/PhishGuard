@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Rules{% endblock %}
+{% block content %}
+<h2>Detection rules</h2>
+<p class="muted">Detections-as-code. Each rule fires an action when its condition matches a finding.</p>
+<table>
+  <tr><th>ID</th><th>Description</th><th>Action</th><th>Severity ≥</th></tr>
+  {% for r in rules %}
+  <tr><td><code>{{ r.id }}</code></td><td>{{ r.description }}</td><td><b>{{ r.action }}</b></td><td>{{ r.severity_at_least.value }}</td></tr>
+  {% endfor %}
+</table>
+<h3>Scoring thresholds</h3>
+<p class="muted">suspicious ≥ {{ cfg.threshold_suspicious }}, phishing ≥ {{ cfg.threshold_phishing }}, malicious ≥ {{ cfg.threshold_malicious }}</p>
+{% endblock %}

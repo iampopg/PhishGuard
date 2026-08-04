@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Feeds{% endblock %}
+{% block content %}
+<h2>Threat-intel feeds</h2>
+<p class="muted">Free feeds (URLhaus, OpenPhish) are pulled into the local cache and used by the URL scanner.
+VirusTotal / Google Safe Browsing enrichment is configured under Settings.</p>
+<form method="post"><button type="submit">Update feeds now</button></form>
+{% if info %}
+<p>Last update: <b>{{ info.time }}</b></p>
+<p>Counts: URLhaus {{ info.counts.urlhaus }}, OpenPhish {{ info.counts.openphish }}</p>
+{% else %}
+<p class="muted">Feeds not updated yet this session.</p>
+{% endif %}
+{% endblock %}

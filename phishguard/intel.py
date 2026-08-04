@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Dict, Optional
+
+CACHE_VERSION = 1
+
+
+class IntelligenceHub:
+    """Threat-intel lookups with graceful offline fallback.
+
+    Works with zero external APIs: defaults to a local blocklist cache.
+    Optional VirusTotal enrichment when enabled and an API key is set.
+    """
+
+    def __init__(self, config, cache_dir: Path = Path(".cache/intel")):
+        self.config = config
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._hash_cache: Dict[str, dict] = {}
+        self._url_cache: Dict[str, dict] = {}
+        self._load_cache()
+
+    def _load_cache(self) -> None:
+        for name, store in (("urls.json", self._url_cache), ("hashes.json", self._hash_cache)):
+            p = self.cache_dir / name
+            if p.exists():
+                try:
+                    store.update(json.loads(p.read_text()))
+                except Exception:
+                    pass
+
+    def _save_cache(self) -> None:
+        (self.cache_dir / "urls.json").write_text(json.dumps(self._url_cache))
+        (self.cache_dir / "hashes.json").write_text(json.dumps(self._hash_cache))
+
+    def add_url_verdict(self, url: str, verdict: dict) -> None:
+        self._url_cache[url] = verdict
+        self._save_cache()
+
+    def add_hash_verdict(self, sha256: str, verdict: dict) -> None:
+        self._hash_cache[sha256.lower()] = verdict
+        self._save_cache()
+
+    def check_url(self, url: str) -> Optional[dict]:
+        if url in self._url_cache:
+            return self._url_cache[url]
+        res = self._vt_url(url) if getattr(self.config, "vt_enabled", False) else None
+        if res is None:
+            res = {"malicious": False, "source": "none"}
+        self._url_cache[url] = res
+        return res
+
+    def check_hash(self, sha256: str) -> Optional[dict]:
+        sha256 = sha256.lower()
+        if sha256 in self._hash_cache:
+            return self._hash_cache[sha256]
+        res = self._vt_hash(sha256) if getattr(self.config, "vt_enabled", False) else None
+        if res is None:
+            res = {"malicious": False, "source": "none"}
+        self._hash_cache[sha256] = res
+        return res
+
+    def _vt_url(self, url: str) -> Optional[dict]:
+        try:
+            import requests  # type: ignore
+        except Exception:
+            return None
+        key = getattr(self.config, "vt_api_key", "")
+        if not key:
+            return None
+        try:
+            r = requests.post(
+                "https://www.virustotal.com/api/v3/urls",
+                headers={"x-apikey": key},
+                data={"url": url}, timeout=10,
+            )
+            if r.status_code == 200:
+                return {"malicious": True, "source": "virustotal", "detail": r.json()}
+        except Exception:
+            return None
+        return None
+
+    def _vt_hash(self, sha256: str) -> Optional[dict]:
+        try:
+            import requests  # type: ignore
+        except Exception:
+            return None
+        key = getattr(self.config, "vt_api_key", "")
+        if not key:
+            return None
+        try:
+            r = requests.get(
+                f"https://www.virustotal.com/api/v3/files/{sha256}",
+                headers={"x-apikey": key}, timeout=10,
+            )
+            if r.status_code == 200:
+                return {"malicious": True, "source": "virustotal", "detail": r.json()}
+        except Exception:
+            return None
+        return None

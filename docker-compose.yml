@@ -1,0 +1,20 @@
+services:
+  phishguard:
+    build: .
+    image: phishguard:latest
+    ports:
+      - "8080:8080"
+    environment:
+      PG_IMAP_SERVER: ${PG_IMAP_SERVER:-}
+      PG_IMAP_USERNAME: ${PG_IMAP_USERNAME:-}
+      PG_IMAP_PASSWORD: ${PG_IMAP_PASSWORD:-}
+      PG_WEB_USERNAME: ${PG_WEB_USERNAME:-admin}
+      PG_WEB_PASSWORD: ${PG_WEB_PASSWORD:-change_me}
+      PG_WEB_SECRET_KEY: ${PG_WEB_SECRET_KEY:-change_me}
+      PG_REPORT_DIR: /app/reports
+      PG_ORG_PROFILE_PATH: /app/org_profile.json
+    volumes:
+      - ./reports:/app/reports
+      - ./.cache:/app/.cache
+      - ./org_profile.json:/app/org_profile.json:ro
+    restart: unless-stopped

@@ -1,0 +1,6 @@
+<div class="card">
+  <h3>Verdict: {{ report.verdict.value }} — score {{ report.risk_score }}</h3>
+  <p>{{ report.summary }}</p>
+  <p><b>Recommended:</b> {{ report.recommended_actions | join(", ") }}</p>
+  <p><a class="btn sec" href="/report/{{ report.report_id }}">View full report</a></p>
+</div>

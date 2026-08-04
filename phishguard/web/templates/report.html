@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Report{% endblock %}
+{% block content %}
+<h2>Report <span class="badge {{ r.verdict }}">{{ r.verdict }}</span> — score {{ r.risk_score }}</h2>
+<p>{{ r.summary }}</p>
+<p><b>Sender:</b> {{ r.sender }}</p>
+<p><b>Recommended actions:</b> {{ r.recommended_actions | join(", ") }}</p>
+
+<h3>Findings</h3>
+<ul class="findings">
+  {% for name, f in findings %}
+  <li><b>{{ name }}</b> — {{ f.title }} <span class="badge {{ f.severity }}">{{ f.severity }}</span><br>
+      <span class="muted">{{ f.detail }}</span></li>
+  {% endfor %}
+</ul>
+
+<h3>Analyst feedback</h3>
+<form method="post" class="card" style="max-width:420px">
+  <label>Label</label>
+  <input type="text" name="label" placeholder="true_positive / false_positive">
+  <label>Note</label>
+  <input type="text" name="note" placeholder="note">
+  <p><button type="submit">Save feedback</button></p>
+</form>
+{% if feedback %}
+<table><tr><th>Label</th><th>Note</th><th>Time</th></tr>
+{% for fb in feedback %}<tr><td>{{ fb.label }}</td><td>{{ fb.note }}</td><td class="muted">{{ fb.timestamp }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+{% endblock %}

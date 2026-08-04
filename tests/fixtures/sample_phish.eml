@@ -1,0 +1,25 @@
+From: "PayPal Security" <security@paypa1.com>
+To: victim@company.com
+Subject: Urgent: verify your account now
+Date: Mon, 04 Aug 2026 10:00:00 +0000
+Return-Path: <security@paypa1.com>
+Reply-To: <security@paypa1.com>
+Message-ID: <abc123@paypa1.com>
+Authentication-Results: spf=pass (paypa1.com: pass); dkim=pass (paypa1.com); dmarc=pass (paypa1.com)
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="BOUND"
+
+--BOUND
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Dear customer, your account will be suspended. Verify now at http://paypa1.com/login and enter your password and OTP immediately. This is a final notice.
+
+--BOUND
+Content-Type: application/octet-stream; name="invoice.exe"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="invoice.exe"
+
+TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAY4AAAAA=
+
+--BOUND--

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2>Dashboard</h2>
+<div class="stats">
+  <div class="stat"><b>{{ counts.safe }}</b>Safe</div>
+  <div class="stat"><b>{{ counts.suspicious }}</b>Suspicious</div>
+  <div class="stat"><b>{{ counts.phishing }}</b>Phishing</div>
+  <div class="stat"><b>{{ counts.malicious }}</b>Malicious</div>
+</div>
+<p class="muted">Live monitor: {% if monitor %}<b style="color:#6ee7b7">running</b>{% else %}stopped{% endif %}</p>
+<h3>Recent analyses</h3>
+<table>
+  <tr><th>Time</th><th>Verdict</th><th>Score</th><th>Sender</th><th>Subject</th></tr>
+  {% for r in recent %}
+  <tr>
+    <td class="muted">{{ r.timestamp[:19] }}</td>
+    <td><span class="badge {{ r.verdict }}">{{ r.verdict }}</span></td>
+    <td>{{ r.risk_score }}</td>
+    <td>{{ (r.sender or {}).from }}</td>
+    <td>{{ (r.source or {}).subject }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p><a class="btn" href="/scan">Scan a message</a> <a class="btn sec" href="/mailbox">Scan mailbox</a></p>
+{% endblock %}

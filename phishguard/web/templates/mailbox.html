@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Mailbox{% endblock %}
+{% block content %}
+<h2>Mailbox (IMAP)</h2>
+<form method="post" class="card">
+  <input type="hidden" name="action" value="save">
+  <div class="row">
+    <div><label>IMAP server</label><input type="text" name="PG_IMAP_SERVER" value="{{ env.get('PG_IMAP_SERVER','') }}"></div>
+    <div><label>Username</label><input type="text" name="PG_IMAP_USERNAME" value="{{ env.get('PG_IMAP_USERNAME','') }}"></div>
+  </div>
+  <div class="row">
+    <div><label>Password / app password</label><input type="password" name="PG_IMAP_PASSWORD" value="{{ env.get('PG_IMAP_PASSWORD','') }}"></div>
+    <div><label>Mailbox</label><input type="text" name="PG_IMAP_MAILBOX" value="{{ env.get('PG_IMAP_MAILBOX','INBOX') }}"></div>
+    <div><label>Port</label><input type="number" name="PG_IMAP_PORT" value="{{ env.get('PG_IMAP_PORT','993') }}"></div>
+  </div>
+  <p>
+    <label><input type="checkbox" name="PG_IMAP_USE_SSL" {% if env.get('PG_IMAP_USE_SSL','true')=='true' %}checked{% endif %}> Use SSL</label>
+    <label><input type="checkbox" name="PG_IMAP_UNSEEN_ONLY" {% if env.get('PG_IMAP_UNSEEN_ONLY','true')=='true' %}checked{% endif %}> Unseen only</label>
+    <label><input type="checkbox" name="PG_IMAP_MARK_READ" {% if env.get('PG_IMAP_MARK_READ','false')=='true' %}checked{% endif %}> Mark as read after scan</label>
+  </p>
+  <p><button type="submit">Save configuration</button></p>
+</form>
+
+<form method="post" class="card">
+  <input type="hidden" name="action" value="scan">
+  <label>Scan N unseen messages now</label>
+  <input type="number" name="limit" value="10" min="1" max="200" style="max-width:120px">
+  <p><button type="submit">Scan now (read-only)</button></p>
+</form>
+
+<form method="post" class="card">
+  <input type="hidden" name="action" value="start_monitor">
+  <label>Monitor interval (seconds)</label>
+  <input type="number" name="interval" value="{{ cfg.monitor_interval }}" style="max-width:120px">
+  <p><button type="submit">Start monitor</button></p>
+</form>
+<form method="post" class="card">
+  <input type="hidden" name="action" value="stop_monitor">
+  <p><button class="btn sec" type="submit">Stop monitor</button></p>
+</form>
+
+{% if results is not none %}
+<h3>Scan results ({{ results | length }})</h3>
+<table><tr><th>Verdict</th><th>Score</th><th>Sender</th><th>Subject</th></tr>
+{% for r in results %}
+<tr><td><span class="badge {{ r.verdict }}">{{ r.verdict }}</span></td><td>{{ r.risk_score }}</td>
+<td>{{ (r.sender or {}).from }}</td><td>{{ (r.source or {}).subject }}</td></tr>
+{% endfor %}
+</table>
+{% endif %}
+{% endblock %}
