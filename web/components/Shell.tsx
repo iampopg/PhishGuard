@@ -47,7 +47,7 @@ function Sidebar() {
         Offline-first · data stays local<br /><b>v1.0</b> · community build
         <div className="credit">
           Coded by <a href="https://github.com/iampopg" target="_blank" rel="noreferrer">@iampopg</a><br />
-          <a href="https://github.com/iampopg/PhishGuard#readme" target="_blank" rel="noreferrer">Click here to start this project →</a>
+          <a href="https://github.com/iampopg/PhishGuard" target="_blank" rel="noreferrer">Star this project on GitHub ★</a>
         </div>
       </div>
     </aside>
