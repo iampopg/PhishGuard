@@ -35,6 +35,25 @@ export default function SettingsPage() {
   useEffect(() => { api.get("/settings").then((d: any) => { setCfg(d.config || {}); setEnv(d.env || {}); }).catch(() => {}); }, []);
   useEffect(() => { api.get("/mailbox").then((d: any) => setMonitorOn(!!d.monitor)).catch(() => {}); }, []);
 
+  // Auto-test enrichment providers that have credentials but aren't enabled yet,
+  // so a working key turns the feature on automatically.
+  const autoTested = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const tryAuto = (p: string, payload: Record<string, string>, flag: string) => {
+      if (autoTested.current.has(p)) return;
+      autoTested.current.add(p);
+      runTest(p, payload, flag);
+    };
+    if (env.PG_VT_API_KEY && env.PG_VT_ENABLED !== "true")
+      tryAuto("vt", { provider: "vt", key: env.PG_VT_API_KEY }, "PG_VT_ENABLED");
+    if (env.PG_GSB_API_KEY && env.PG_GSB_ENABLED !== "true")
+      tryAuto("gsb", { provider: "gsb", key: env.PG_GSB_API_KEY }, "PG_GSB_ENABLED");
+    if (env.PG_CLAMAV_HOST && env.PG_CLAMAV_ENABLED !== "true")
+      tryAuto("clamav", { provider: "clamav", host: env.PG_CLAMAV_HOST }, "PG_CLAMAV_ENABLED");
+    if (env.PG_SANDBOX_API_KEY && env.PG_SANDBOX_URL && env.PG_SANDBOX_ENABLED !== "true")
+      tryAuto("sandbox", { provider: "sandbox", key: env.PG_SANDBOX_API_KEY, url: env.PG_SANDBOX_URL }, "PG_SANDBOX_ENABLED");
+  }, [env]);
+
   const bv = (k: string) => env[k] === "true" || cfg[k] === true;
   const iv = (k: string) => (env[k] !== undefined && env[k] !== "" ? env[k] : cfg[k] ?? "");
   const sv = (k: string) => (env[k] !== undefined ? env[k] : (cfg[k] ?? ""));
