@@ -9,10 +9,10 @@ description = "Industrial-grade email phishing detection and analysis engine wit
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Rancorp" }]
+authors = [{ name = "WRANCORP" }]
 keywords = ["phishing", "email-security", "antiphishing", "threat-detection", "dfir"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -23,6 +23,8 @@ dependencies = [
     "dnspython>=2.4",
     "requests>=2.31",
     "python-dotenv>=1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
     "flask>=3.0",
     "flask-login>=0.6",
     "werkzeug>=3.0",

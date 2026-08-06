@@ -26,7 +26,7 @@ function Sidebar() {
     <aside className="sidebar">
       <div className="brand">
         <div className="logo">P</div>
-        <div><div className="name">PhishGuard</div><div className="sub">Detection Engine</div></div>
+        <div><div className="name">PhishGuard <span className="beta-badge">BETA</span></div><div className="sub">Detection Engine</div></div>
       </div>
       <nav className="nav">
         {Object.entries(groups).map(([g, items]) => (

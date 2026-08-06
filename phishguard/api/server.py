@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+import json
 import threading
 import time
 from pathlib import Path
 from typing import List, Optional
+
+import requests
 
 from email.header import decode_header, make_header
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
@@ -395,11 +398,76 @@ def create_api() -> FastAPI:
         if action == "test":
             ctx = _runtime_ctx()
             sample = _store(ctx.config).list_reports(limit=1)
-            if sample:
-                ExportManager(ctx.config).export(_dict_to_report(sample[0]))
-                return {"ok": True, "tested": True}
-            return {"ok": True, "tested": False, "note": "no reports"}
+            if not sample:
+                return {"ok": True, "tested": False, "note": "no reports to export"}
+            import socket as _sock
+            from phishguard.export import build_cef
+            report = _dict_to_report(sample[0])
+            cfg = ctx.config
+            addr = cfg.export_syslog_addr
+            wh = cfg.export_webhook_url
+            use_cef = cfg.export_use_cef
+            dests = []
+            if addr:
+                try:
+                    host, _, port = addr.partition(":")
+                    port = int(port) if port else 514
+                    msg = build_cef(report) if use_cef else json.dumps(report.to_dict(), default=str)
+                    s = _sock.socket(_sock.AF_INET, _sock.SOCK_DGRAM)
+                    s.sendto(msg.encode("utf-8"), (host, port))
+                    s.close()
+                    dests.append({"type": "syslog", "target": addr, "ok": True})
+                except Exception as e:
+                    dests.append({"type": "syslog", "target": addr, "ok": False, "detail": str(e)})
+            if wh:
+                try:
+                    requests.post(wh, json=report.to_dict(), timeout=10)
+                    dests.append({"type": "webhook", "target": wh, "ok": True})
+                except Exception as e:
+                    dests.append({"type": "webhook", "target": wh, "ok": False, "detail": str(e)})
+            if not dests:
+                dests.append({"type": "none", "ok": False, "detail": "No syslog address or webhook URL configured"})
+            return {"ok": True, "tested": True, "destinations": dests}
         return {"ok": True}
+
+    # ---------- enrichment test ----------
+    @app.post("/api/enrichment/test")
+    async def enrichment_test(request: Request):
+        d = dict(await request.form())
+        provider = (d.get("provider") or "").lower()
+        key = d.get("key", "") or ""
+        host = d.get("host", "") or ""
+        url = d.get("url", "") or ""
+        if provider == "vt":
+            if not key:
+                return {"ok": False, "message": "No VirusTotal API key provided"}
+            try:
+                r = requests.get("https://www.virustotal.com/api/v3/ip_addresses/1.1.1.1",
+                                  headers={"x-apikey": key}, timeout=12)
+                if r.status_code == 200:
+                    return {"ok": True, "message": "VirusTotal connected successfully"}
+                return {"ok": False, "message": f"VirusTotal returned HTTP {r.status_code}"}
+            except Exception as e:
+                return {"ok": False, "message": f"VirusTotal unreachable: {e}"}
+        if provider == "gsb":
+            if not key:
+                return {"ok": False, "message": "No Google Safe Browsing API key provided"}
+            return {"ok": True, "message": "Google Safe Browsing key saved (live test skipped to avoid API quota)"}
+        if provider == "clamav":
+            import socket as _sock
+            target = host or "127.0.0.1:3310"
+            try:
+                h, _, p = target.partition(":")
+                s = _sock.create_connection((h, int(p or 3310)), timeout=5)
+                s.close()
+                return {"ok": True, "message": f"ClamAV reachable at {target}"}
+            except Exception as e:
+                return {"ok": False, "message": f"ClamAV unreachable at {target}: {e}"}
+        if provider == "sandbox":
+            if key and url:
+                return {"ok": True, "message": "Sandbox credentials saved"}
+            return {"ok": False, "message": "Sandbox requires both API key and URL"}
+        return {"ok": False, "message": "Unknown provider"}
 
     # ---------- settings ----------
     @app.get("/api/settings")
@@ -409,21 +477,26 @@ def create_api() -> FastAPI:
 
     @app.post("/api/settings")
     async def settings_save(request: Request):
-        form = dict(await request.form())
+        fd = await request.form()
+        form = {}
+        for k, v in fd.multi_items():
+            form[k] = v
         updates = {}
         for key in (BOOL_KEYS | INT_KEYS | STRING_KEYS):
-            if key in form:
-                val = form[key]
-                if val in ("", None):
-                    continue  # never wipe a stored value with a blank field
-                if key in BOOL_KEYS:
-                    updates[key] = "true" if val in ("true", "on", "1") else "false"
-                elif key in INT_KEYS:
-                    try:
-                        updates[key] = str(int(val))
-                    except ValueError:
-                        pass
-                else:
+            if key not in form:
+                continue
+            val = form[key]
+            if key in BOOL_KEYS:
+                # last-wins handles the hidden-input(false)+checkbox(true) trick:
+                # checked -> true, unchecked -> false.
+                updates[key] = "true" if (val or "") in ("true", "on", "1") else "false"
+            elif key in INT_KEYS:
+                try:
+                    updates[key] = str(int(val))
+                except ValueError:
+                    pass
+            else:
+                if val not in (None, ""):
                     updates[key] = val
         update_env(updates)
         reload_env()

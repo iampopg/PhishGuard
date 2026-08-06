@@ -1,14 +1,23 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Shell from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Spinner, AlertBox } from "@/components/ui";
 
-function Toggle({ name, label, checked }: { name: string; label: string; checked: boolean }) {
+const ENRICH: Record<string, { provider: string; enable: string }> = {
+  PG_VT_API_KEY: { provider: "vt", enable: "PG_VT_ENABLED" },
+  PG_GSB_API_KEY: { provider: "gsb", enable: "PG_GSB_ENABLED" },
+  PG_CLAMAV_HOST: { provider: "clamav", enable: "PG_CLAMAV_ENABLED" },
+  PG_SANDBOX_API_KEY: { provider: "sandbox", enable: "PG_SANDBOX_ENABLED" },
+  PG_SANDBOX_URL: { provider: "sandbox", enable: "PG_SANDBOX_ENABLED" },
+};
+
+function Toggle({ name, label, checked, onChange }: { name: string; label: string; checked: boolean; onChange?: (v: boolean) => void }) {
   return (
     <label className="check" style={{ marginBottom: 10 }}>
       <input type="hidden" name={name} value="false" />
-      <input type="checkbox" name={name} value="true" defaultChecked={checked} />
+      <input type="checkbox" name={name} value="true" defaultChecked={checked}
+        onChange={(e) => onChange && onChange(e.target.checked)} />
       <span>{label}</span>
     </label>
   );
@@ -17,53 +26,96 @@ function Toggle({ name, label, checked }: { name: string; label: string; checked
 export default function SettingsPage() {
   const [cfg, setCfg] = useState<any>({});
   const [env, setEnv] = useState<any>({});
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
   const [monitorOn, setMonitorOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState("");
+  const [status, setStatus] = useState<Record<string, { state: "idle" | "testing" | "ok" | "err"; msg?: string }>>({});
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => { api.get("/settings").then((d: any) => { setCfg(d.config || {}); setEnv(d.env || {}); }).catch(() => {}); }, []);
   useEffect(() => { api.get("/mailbox").then((d: any) => setMonitorOn(!!d.monitor)).catch(() => {}); }, []);
 
+  const bv = (k: string) => env[k] === "true" || cfg[k] === true;
+  const iv = (k: string) => (env[k] !== undefined && env[k] !== "" ? env[k] : cfg[k] ?? "");
+  const sv = (k: string) => (env[k] !== undefined ? env[k] : (cfg[k] ?? ""));
+  const secrets = ["PG_VT_API_KEY", "PG_GSB_API_KEY", "PG_SANDBOX_API_KEY", "PG_SANDBOX_URL", "PG_IMAP_PASSWORD", "PG_WEB_PASSWORD", "PG_WEB_SECRET_KEY"];
+
+  const saveAll = async () => {
+    if (!formRef.current) return;
+    setBusy(true); setFlash("");
+    const fd = new FormData(formRef.current);
+    try {
+      await api.postForm("/settings", Object.fromEntries(fd));
+      setEnv(Object.fromEntries(fd));
+    } catch (e: any) { setFlash(e.message); }
+    setBusy(false);
+  };
+
+  const runTest = async (provider: string, payload: Record<string, string>, enableFlag: string) => {
+    setStatus((s) => ({ ...s, [provider]: { state: "testing" } }));
+    try {
+      const d: any = await api.postForm("/enrichment/test", payload);
+      setStatus((s) => ({ ...s, [provider]: { state: d.ok ? "ok" : "err", msg: d.message } }));
+      await saveFieldFlag(enableFlag, d.ok ? "true" : "false");
+    } catch (e: any) {
+      setStatus((s) => ({ ...s, [provider]: { state: "err", msg: e.message } }));
+    }
+  };
+
+  const saveFieldFlag = async (key: string, value: string) => {
+    await api.postForm("/settings", { [key]: value });
+    setEnv((e: any) => ({ ...e, [key]: value }));
+  };
+
+  const onEnrichBlur = (key: string) => {
+    saveAll();
+    const e = ENRICH[key];
+    if (!e) return;
+    const payload: Record<string, string> = { provider: e.provider };
+    if (e.provider === "clamav") {
+      payload.host = (formRef.current?.elements as any)[key]?.value || "";
+    } else {
+      payload.key = key === "PG_SANDBOX_URL" ? (env.PG_SANDBOX_API_KEY || "") : (formRef.current?.elements as any)[key]?.value || "";
+      payload.url = key === "PG_SANDBOX_URL" ? (formRef.current?.elements as any)[key]?.value || "" : (env.PG_SANDBOX_URL || "");
+    }
+    runTest(e.provider, payload, e.enable);
+  };
+
   const toggleMonitor = async () => {
-    setBusy(true); setMsg("");
+    setBusy(true);
     try {
       await api.postForm(monitorOn ? "/mailbox/monitor/stop" : "/mailbox/monitor/start", {});
       setMonitorOn(!monitorOn);
-      setMsg(monitorOn ? "Monitoring stopped" : "Monitoring started");
-    } catch (e: any) { setMsg(e.message); }
-    setBusy(false);
-  };
-  const bv = (k: string) => env[k] === "true" || cfg[k] === true;
-  const iv = (k: string) => (env[k] !== undefined && env[k] !== "" ? env[k] : cfg[k] ?? "");
-  const sv = (k: string) => env[k] !== undefined ? env[k] : (cfg[k] ?? "");
-
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true); setMsg("");
-    const fd = new FormData(e.currentTarget as HTMLFormElement);
-    try { await api.postForm("/settings", Object.fromEntries(fd)); setMsg("Settings saved"); }
-    catch (e: any) { setMsg(e.message); }
+      setFlash(monitorOn ? "Monitoring stopped" : "Monitoring started");
+    } catch (e: any) { setFlash(e.message); }
     setBusy(false);
   };
 
-  const secrets = ["PG_VT_API_KEY", "PG_GSB_API_KEY", "PG_SANDBOX_API_KEY", "PG_SANDBOX_URL", "PG_IMAP_PASSWORD", "PG_WEB_PASSWORD", "PG_WEB_SECRET_KEY"];
+  const StatusBadge = ({ provider }: { provider: string }) => {
+    const s = status[provider];
+    if (!s || s.state === "idle") return null;
+    if (s.state === "testing") return <span className="env-status testing">testing…</span>;
+    if (s.state === "ok") return <span className="env-status ok">✓ {s.msg}</span>;
+    return <span className="env-status err">✗ {s.msg}</span>;
+  };
 
   return (
-    <Shell title="Settings" sub="Engine behaviour, enrichment & server">
-      <form onSubmit={save}>
+    <Shell title="Settings" sub="Engine behaviour, enrichment & server (changes auto-save)">
+      <form ref={formRef} onSubmit={(e) => { e.preventDefault(); saveAll(); }}>
         <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
           <div className="card"><div className="card-h"><h3>Detection engine</h3></div><div className="card-b">
-            <Toggle name="PG_DNS_CHECKS_ENABLED" label="DNS / reputation checks" checked={bv("PG_DNS_CHECKS_ENABLED")} />
-            <Toggle name="PG_BEHAVIORAL_ENABLED" label="Behavioral BEC baseline" checked={bv("PG_BEHAVIORAL_ENABLED")} />
-            <Toggle name="PG_SANDBOX_ENABLED" label="Sandbox execution" checked={bv("PG_SANDBOX_ENABLED")} />
-            <Toggle name="PG_CLAMAV_ENABLED" label="ClamAV attachment scan" checked={bv("PG_CLAMAV_ENABLED")} />
+            <Toggle name="PG_DNS_CHECKS_ENABLED" label="DNS / reputation checks" checked={bv("PG_DNS_CHECKS_ENABLED")} onChange={() => saveAll()} />
+            <Toggle name="PG_BEHAVIORAL_ENABLED" label="Behavioral BEC baseline" checked={bv("PG_BEHAVIORAL_ENABLED")} onChange={() => saveAll()} />
+            <Toggle name="PG_SANDBOX_ENABLED" label="Sandbox execution" checked={bv("PG_SANDBOX_ENABLED")} onChange={() => saveAll()} />
+            <Toggle name="PG_CLAMAV_ENABLED" label="ClamAV attachment scan" checked={bv("PG_CLAMAV_ENABLED")} onChange={() => saveAll()} />
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "14px 0" }} />
-            <Toggle name="PG_VT_ENABLED" label="VirusTotal enrichment" checked={bv("PG_VT_ENABLED")} />
-            <Toggle name="PG_GSB_ENABLED" label="Google Safe Browsing" checked={bv("PG_GSB_ENABLED")} />
+            <Toggle name="PG_VT_ENABLED" label="VirusTotal enrichment" checked={bv("PG_VT_ENABLED")} onChange={() => saveAll()} />
+            <Toggle name="PG_GSB_ENABLED" label="Google Safe Browsing" checked={bv("PG_GSB_ENABLED")} onChange={() => saveAll()} />
           </div></div>
           <div className="card"><div className="card-h"><h3>Mailbox & response</h3></div><div className="card-b">
-            <Toggle name="PG_IMAP_USE_SSL" label="IMAP SSL/TLS" checked={bv("PG_IMAP_USE_SSL")} />
-            <Toggle name="PG_IMAP_UNSEEN_ONLY" label="Unseen only" checked={bv("PG_IMAP_UNSEEN_ONLY")} />
-            <Toggle name="PG_IMAP_MARK_READ" label="Mark read after scan" checked={bv("PG_IMAP_MARK_READ")} />
+            <Toggle name="PG_IMAP_USE_SSL" label="IMAP SSL/TLS" checked={bv("PG_IMAP_USE_SSL")} onChange={() => saveAll()} />
+            <Toggle name="PG_IMAP_UNSEEN_ONLY" label="Unseen only" checked={bv("PG_IMAP_UNSEEN_ONLY")} onChange={() => saveAll()} />
+            <Toggle name="PG_IMAP_MARK_READ" label="Mark read after scan" checked={bv("PG_IMAP_MARK_READ")} onChange={() => saveAll()} />
             <div className="monitor-toggle">
               <span>Continuous monitoring</span>
               <button type="button" className={`toggle-btn ${monitorOn ? "on" : ""}`} onClick={toggleMonitor} disabled={busy}>
@@ -71,42 +123,46 @@ export default function SettingsPage() {
               </button>
             </div>
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "14px 0" }} />
-            <Toggle name="PG_REMEDIATION_ENABLED" label="Remediation enabled" checked={bv("PG_REMEDIATION_ENABLED")} />
-            <Toggle name="PG_EXPORT_ENABLED" label="Export enabled" checked={bv("PG_EXPORT_ENABLED")} />
-            <Toggle name="PG_EXPORT_CEF" label="Export as CEF" checked={bv("PG_EXPORT_CEF")} />
+            <Toggle name="PG_REMEDIATION_ENABLED" label="Remediation enabled" checked={bv("PG_REMEDIATION_ENABLED")} onChange={() => saveAll()} />
+            <Toggle name="PG_EXPORT_ENABLED" label="Export enabled" checked={bv("PG_EXPORT_ENABLED")} onChange={() => saveAll()} />
+            <Toggle name="PG_EXPORT_CEF" label="Export as CEF" checked={bv("PG_EXPORT_CEF")} onChange={() => saveAll()} />
           </div></div>
           <div className="card"><div className="card-h"><h3>Thresholds & intervals</h3></div><div className="card-b">
             <div className="row row-3">
-              <div className="field"><label>Suspicious ≥</label><input name="PG_THRESHOLD_SUSPICIOUS" defaultValue={iv("PG_THRESHOLD_SUSPICIOUS")} /></div>
-              <div className="field"><label>Phishing ≥</label><input name="PG_THRESHOLD_PHISHING" defaultValue={iv("PG_THRESHOLD_PHISHING")} /></div>
-              <div className="field"><label>Malicious ≥</label><input name="PG_THRESHOLD_MALICIOUS" defaultValue={iv("PG_THRESHOLD_MALICIOUS")} /></div>
+              <div className="field"><label>Suspicious ≥</label><input name="PG_THRESHOLD_SUSPICIOUS" defaultValue={iv("PG_THRESHOLD_SUSPICIOUS")} onBlur={saveAll} /></div>
+              <div className="field"><label>Phishing ≥</label><input name="PG_THRESHOLD_PHISHING" defaultValue={iv("PG_THRESHOLD_PHISHING")} onBlur={saveAll} /></div>
+              <div className="field"><label>Malicious ≥</label><input name="PG_THRESHOLD_MALICIOUS" defaultValue={iv("PG_THRESHOLD_MALICIOUS")} onBlur={saveAll} /></div>
             </div>
             <div className="row row-3">
-              <div className="field"><label>Monitor (s)</label><input name="PG_MONITOR_INTERVAL" defaultValue={iv("PG_MONITOR_INTERVAL")} /></div>
-              <div className="field"><label>BEC baseline (d)</label><input name="PG_BEHAVIORAL_BASELINE_DAYS" defaultValue={iv("PG_BEHAVIORAL_BASELINE_DAYS")} /></div>
-              <div className="field"><label>IMAP port</label><input name="PG_IMAP_PORT" defaultValue={iv("PG_IMAP_PORT")} /></div>
+              <div className="field"><label>Monitor (s)</label><input name="PG_MONITOR_INTERVAL" defaultValue={iv("PG_MONITOR_INTERVAL")} onBlur={saveAll} /></div>
+              <div className="field"><label>BEC baseline (d)</label><input name="PG_BEHAVIORAL_BASELINE_DAYS" defaultValue={iv("PG_BEHAVIORAL_BASELINE_DAYS")} onBlur={saveAll} /></div>
+              <div className="field"><label>IMAP port</label><input name="PG_IMAP_PORT" defaultValue={iv("PG_IMAP_PORT")} onBlur={saveAll} /></div>
             </div>
             <div className="row row-2">
-              <div className="field"><label>ClamAV port</label><input name="PG_CLAMAV_PORT" defaultValue={iv("PG_CLAMAV_PORT")} /></div>
-              <div className="field"><label>Web port</label><input name="PG_WEB_PORT" defaultValue={iv("PG_WEB_PORT")} /></div>
+              <div className="field"><label>ClamAV port</label><input name="PG_CLAMAV_PORT" defaultValue={iv("PG_CLAMAV_PORT")} onBlur={saveAll} /></div>
+              <div className="field"><label>Web port</label><input name="PG_WEB_PORT" defaultValue={iv("PG_WEB_PORT")} onBlur={saveAll} /></div>
             </div>
           </div></div>
           <div className="card"><div className="card-h"><h3>Enrichment keys & paths</h3></div><div className="card-b">
-            <div className="field"><label>Trusted domains</label><input name="PG_TRUSTED_DOMAINS" defaultValue={sv("PG_TRUSTED_DOMAINS")} /></div>
-            <div className="field"><label>Org profile path</label><input name="PG_ORG_PROFILE_PATH" defaultValue={sv("PG_ORG_PROFILE_PATH")} /></div>
-            <div className="field"><label>Report directory</label><input name="PG_REPORT_DIR" defaultValue={sv("PG_REPORT_DIR")} /></div>
-            <div className="field"><label>ClamAV host</label><input name="PG_CLAMAV_HOST" defaultValue={sv("PG_CLAMAV_HOST")} /></div>
-            <div className="field"><label>Sandbox provider</label><input name="PG_SANDBOX_PROVIDER" defaultValue={sv("PG_SANDBOX_PROVIDER")} /></div>
-            <div className="field"><label>Log level</label>
-              <select name="PG_LOG_LEVEL" defaultValue={sv("PG_LOG_LEVEL") || "INFO"}>{["DEBUG", "INFO", "WARNING", "ERROR"].map((l) => <option key={l}>{l}</option>)}</select></div>
+            <div className="field"><label>Trusted domains</label><input name="PG_TRUSTED_DOMAINS" defaultValue={sv("PG_TRUSTED_DOMAINS")} onBlur={saveAll} /></div>
+            <div className="field"><label>Org profile path</label><input name="PG_ORG_PROFILE_PATH" defaultValue={sv("PG_ORG_PROFILE_PATH")} onBlur={saveAll} /></div>
+            <div className="field"><label>Report directory</label><input name="PG_REPORT_DIR" defaultValue={sv("PG_REPORT_DIR")} onBlur={saveAll} /></div>
+            <div className="field"><label>ClamAV host</label>
+              <input name="PG_CLAMAV_HOST" defaultValue={sv("PG_CLAMAV_HOST")} onBlur={() => onEnrichBlur("PG_CLAMAV_HOST")} />
+              <StatusBadge provider="clamav" /></div>
+            <div className="field"><label>Sandbox provider</label><input name="PG_SANDBOX_PROVIDER" defaultValue={sv("PG_SANDBOX_PROVIDER")} onBlur={saveAll} /></div>
             {secrets.map((k) => (
-              <div className="field" key={k}><label>{k.replace("PG_", "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}</label><input type="password" name={k} defaultValue={env[k] || ""} placeholder="••••••••" /></div>
+              <div className="field" key={k}>
+                <label>{k.replace("PG_", "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}</label>
+                <input type="password" name={k} defaultValue={env[k] || ""} placeholder="••••••••"
+                  onBlur={() => onEnrichBlur(k)} />
+                {ENRICH[k] && <StatusBadge provider={ENRICH[k].provider} />}
+              </div>
             ))}
           </div></div>
         </div>
-        <div className="actions" style={{ marginTop: 4 }}><button className="btn btn-primary" type="submit" disabled={busy}>{busy ? <Spinner /> : "Save settings"}</button></div>
-        {msg && <div style={{ marginTop: 12 }}><AlertBox kind="ok">{msg}</AlertBox></div>}
       </form>
+      <div style={{ marginTop: 12 }}>{busy && <span className="env-status testing">saving…</span>}{flash && <AlertBox kind="ok">{flash}</AlertBox>}</div>
     </Shell>
   );
 }

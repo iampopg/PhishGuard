@@ -10,7 +10,13 @@
   <img src="https://img.shields.io/badge/web-Next.js%2014%20%2B%20FastAPI-8a2be2.svg" alt="Next.js + FastAPI" />
   <img src="https://img.shields.io/badge/deployment-single--port-ff69b4.svg" alt="Single port" />
   <a href="https://github.com/iampopg/PhishGuard"><img src="https://img.shields.io/github/stars/iampopg/PhishGuard?style=social" alt="Stars" /></a>
+  <img src="https://img.shields.io/badge/status-in--development-orange.svg" alt="Status: in development" />
 </p>
+
+> **⚠️ Project status: in development (beta).** The detection engine, CLI, and web dashboard
+> work, but some features are **not yet functional** — in particular **Remediation**
+> (M365 / Gmail move / delete / notify) is not implemented yet (the UI exists, but actions are
+> currently no-ops). See [Known limitations](#limitations--roadmap).
 
 <p align="center">
   <b>Self-hosted · offline-first email phishing detection &amp; analysis engine</b><br/>
@@ -442,6 +448,15 @@ pages render; scan upload + feedback persist).
 - **Single-admin auth.** The web UI uses a bearer token; rotate `PG_WEB_SECRET_KEY` regularly.
 
 ---
+
+## Known limitations
+
+- **Remediation is not yet implemented.** The Remediation page and settings exist, but the
+  Microsoft 365 (Graph) and Gmail move / delete / notify actions are currently no-ops.
+- Rules are view-only in the UI (edit `rules/defaults.py` to change them).
+- Behavioral BEC uses a local baseline (your org only), not a cross-tenant network effect.
+- Sandbox / ClamAV and VirusTotal / Google Safe Browsing enrichment are optional and require
+  your own keys/host; without them detection runs fully locally.
 
 ## Roadmap
 
