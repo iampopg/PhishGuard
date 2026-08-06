@@ -1,23 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Remediation{% endblock %}
+{% block title %}Remediation · PhishGuard{% endblock %}
+{% block page_title %}Remediation<small>Post-delivery takedown · opt-in, degrades safely</small>{% endblock %}
 {% block content %}
-<h2>Remediation (post-delivery)</h2>
-<p class="muted">Actions run after delivery (move to junk/quarantine, soft-delete, notify). Not a pre-delivery gateway.</p>
-<form method="post" class="card">
-  <label><input type="checkbox" name="PG_REMEDIATION_ENABLED" {% if env.get('PG_REMEDIATION_ENABLED','false')=='true' %}checked{% endif %}> Enable remediation</label>
-  <label>Provider</label>
-  <select name="PG_REMEDIATION_PROVIDER">
-    <option value="" {% if not env.get('PG_REMEDIATION_PROVIDER') %}selected{% endif %}>— none —</option>
-    <option value="m365" {% if env.get('PG_REMEDIATION_PROVIDER')=='m365' %}selected{% endif %}>Microsoft 365 (Graph)</option>
-    <option value="gmail" {% if env.get('PG_REMEDIATION_PROVIDER')=='gmail' %}selected{% endif %}>Gmail API</option>
-  </select>
-  <div class="row">
-    <div><label>M365 Tenant ID</label><input type="text" name="PG_M365_TENANT_ID" value="{{ env.get('PG_M365_TENANT_ID','') }}"></div>
-    <div><label>M365 Client ID</label><input type="text" name="PG_M365_CLIENT_ID" value="{{ env.get('PG_M365_CLIENT_ID','') }}"></div>
-    <div><label>M365 Client Secret</label><input type="password" name="PG_M365_CLIENT_SECRET" value="{{ env.get('PG_M365_CLIENT_SECRET','') }}"></div>
+<div class="card" style="max-width:820px">
+  <div class="card-h"><h3>Provider</h3><span class="sub">read-only until enabled</span></div>
+  <div class="card-b">
+    <div class="alert info" style="margin-bottom:16px">Remediation soft-deletes or moves already-delivered messages in your mailbox via provider APIs. It is <b>disabled by default</b> and never acts during scanning. PhishGuard still analyzes everything read-only.</div>
+    <form method="post">
+      <label class="check" style="margin-bottom:14px"><input type="checkbox" name="PG_REMEDIATION_ENABLED" {% if env.get('PG_REMEDIATION_ENABLED','false')=='true' %}checked{% endif %}><span>Enable remediation actions</span></label>
+      <div class="field"><label>Provider</label>
+        <select name="PG_REMEDIATION_PROVIDER">
+          <option value="" {% if not env.get('PG_REMEDIATION_PROVIDER') %}selected{% endif %}>None</option>
+          <option value="m365" {% if env.get('PG_REMEDIATION_PROVIDER')=='m365' %}selected{% endif %}>Microsoft 365 (Graph)</option>
+          <option value="gmail" {% if env.get('PG_REMEDIATION_PROVIDER')=='gmail' %}selected{% endif %}>Gmail (Service Account)</option>
+        </select></div>
+      <div class="row row-3">
+        <div class="field"><label>Tenant ID</label><input name="PG_M365_TENANT_ID" value="{{ env.get('PG_M365_TENANT_ID','') }}"></div>
+        <div class="field"><label>Client ID</label><input name="PG_M365_CLIENT_ID" value="{{ env.get('PG_M365_CLIENT_ID','') }}"></div>
+        <div class="field"><label>Client secret</label><input type="password" name="PG_M365_CLIENT_SECRET" value="{{ env.get('PG_M365_CLIENT_SECRET','') }}"></div>
+      </div>
+      <div class="field"><label>Gmail service-account JSON</label><textarea name="PG_GMAIL_SA_JSON" style="min-height:70px">{{ env.get('PG_GMAIL_SA_JSON','') }}</textarea></div>
+      <button class="btn btn-primary" type="submit">Save configuration</button>
+    </form>
   </div>
-  <label>Gmail service-account JSON path</label>
-  <input type="text" name="PG_GMAIL_SA_JSON" value="{{ env.get('PG_GMAIL_SA_JSON','') }}">
-  <p><button type="submit">Save remediation config</button></p>
-</form>
+</div>
 {% endblock %}

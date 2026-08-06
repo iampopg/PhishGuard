@@ -129,6 +129,9 @@ class Report:
     attachments: List[Attachment]
     recommended_actions: List[str]
     labels: Dict[str, Any]
+    raw_headers: Dict[str, str] = field(default_factory=dict)
+    body_text: str = ""
+    body_html: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -145,6 +148,9 @@ class Report:
             "attachments": [a.to_dict() for a in self.attachments],
             "recommended_actions": self.recommended_actions,
             "labels": self.labels,
+            "raw_headers": self.raw_headers,
+            "body_text": self.body_text,
+            "body_html": self.body_html,
         }
 
     def to_json(self, indent: Optional[int] = 2) -> str:

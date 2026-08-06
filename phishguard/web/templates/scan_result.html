@@ -1,6 +1,23 @@
 <div class="card">
-  <h3>Verdict: {{ report.verdict.value }} — score {{ report.risk_score }}</h3>
-  <p>{{ report.summary }}</p>
-  <p><b>Recommended:</b> {{ report.recommended_actions | join(", ") }}</p>
-  <p><a class="btn sec" href="/report/{{ report.report_id }}">View full report</a></p>
+  <div class="card-h">
+    <h3>Result</h3>
+    <a class="btn btn-ghost btn-sm" href="/report/{{ report.report_id }}">Open full report</a>
+  </div>
+  <div class="card-b">
+    <div class="hero">
+      <div class="ring" style="--p:{{ report.risk_score }}"><b>{{ report.risk_score }}</b></div>
+      <div style="flex:1;min-width:0">
+        <div class="actions" style="margin-bottom:8px">
+          <span class="badge {{ report.verdict.value }}"><span class="bdot"></span>Verdict: {{ report.verdict.value|capitalize }}</span>
+          <span class="pill">{{ report.analyzers|length }} analyzers</span>
+        </div>
+        <div class="muted small">From {{ report.sender.from }}</div>
+      </div>
+    </div>
+    {% if report.summary %}<div class="alert info" style="margin-top:14px;margin-bottom:0">{{ report.summary }}</div>{% endif %}
+    {% if report.recommended_actions %}
+    <div class="muted small" style="margin:14px 0 4px;font-weight:600">Recommended actions</div>
+    <ul class="small" style="margin:0;padding-left:18px;color:var(--muted)">{% for a in report.recommended_actions %}<li style="margin-bottom:4px">{{ a }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
 </div>

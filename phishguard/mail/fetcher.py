@@ -41,6 +41,9 @@ class MailFetcher:
     def fetch_recent(self, limit: int = 50) -> List[Tuple[str, bytes]]:
         return self._fetch("RECENT", limit)
 
+    def fetch_all(self, limit: int = 1000) -> List[Tuple[str, bytes]]:
+        return self._fetch("ALL", limit)
+
     def _fetch(self, criterion: str, limit: int) -> List[Tuple[str, bytes]]:
         if not self._conn:
             self.connect()

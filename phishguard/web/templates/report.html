@@ -1,30 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Report{% endblock %}
+{% block title %}{{ r.source.subject or 'Report' }} · PhishGuard{% endblock %}
+{% block page_title %}{{ r.source.subject or '(no subject)' }}<small>Report {{ r.report_id }}</small>{% endblock %}
 {% block content %}
-<h2>Report <span class="badge {{ r.verdict }}">{{ r.verdict }}</span> — score {{ r.risk_score }}</h2>
-<p>{{ r.summary }}</p>
-<p><b>Sender:</b> {{ r.sender }}</p>
-<p><b>Recommended actions:</b> {{ r.recommended_actions | join(", ") }}</p>
+<div class="grid" style="grid-template-columns:1.7fr 1fr;align-items:start">
+  <div class="grid" style="gap:18px">
+    <div class="card">
+      <div class="card-b">
+        <div class="hero">
+          <div class="ring" style="--p:{{ r.risk_score }}"><b>{{ r.risk_score }}</b></div>
+          <div style="flex:1;min-width:0">
+            <div class="actions" style="margin-bottom:8px">
+              <span class="badge {{ r.verdict }}"><span class="bdot"></span>{{ r.verdict|capitalize }}</span>
+              <span class="pill">{{ r.analyzers|length }} analyzers run</span>
+              <span class="pill">{{ r.timestamp[:19]|replace('T',' ') }}</span>
+            </div>
+            <div class="muted small">From <b style="color:var(--text)">{{ r.sender.display_name or r.sender.from }}</b> &lt;{{ r.sender.from }}&gt;</div>
+          </div>
+        </div>
+        {% if r.summary %}<div class="alert info" style="margin-top:16px;margin-bottom:0">{{ r.summary }}</div>{% endif %}
+      </div>
+    </div>
 
-<h3>Findings</h3>
-<ul class="findings">
-  {% for name, f in findings %}
-  <li><b>{{ name }}</b> — {{ f.title }} <span class="badge {{ f.severity }}">{{ f.severity }}</span><br>
-      <span class="muted">{{ f.detail }}</span></li>
-  {% endfor %}
-</ul>
+    <div class="card">
+      <div class="card-h"><h3>Findings</h3><span class="sub">grouped by analyzer</span></div>
+      <div class="card-b">
+        {% for a in r.analyzers %}
+        <div class="analyzer-block">
+          <h4>{{ a.name }} <span class="sc">+{{ a.score }}</span></h4>
+          {% if a.findings %}
+            {% for f in a.findings %}
+            <div class="finding">
+              <div class="ft"><b>{{ f.title }}</b><span class="sev {{ f.severity }}">{{ f.severity }}</span></div>
+              <div class="fd">{{ f.detail }}</div>
+              <div class="fd muted small">contribution: +{{ f.score }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="muted small" style="padding:4px 0">No findings.</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 
-<h3>Analyst feedback</h3>
-<form method="post" class="card" style="max-width:420px">
-  <label>Label</label>
-  <input type="text" name="label" placeholder="true_positive / false_positive">
-  <label>Note</label>
-  <input type="text" name="note" placeholder="note">
-  <p><button type="submit">Save feedback</button></p>
-</form>
-{% if feedback %}
-<table><tr><th>Label</th><th>Note</th><th>Time</th></tr>
-{% for fb in feedback %}<tr><td>{{ fb.label }}</td><td>{{ fb.note }}</td><td class="muted">{{ fb.timestamp }}</td></tr>{% endfor %}
-</table>
-{% endif %}
+  <div class="grid" style="gap:18px">
+    <div class="card">
+      <div class="card-h"><h3>Details</h3></div>
+      <div class="card-b">
+        <dl class="kv">
+          <dt>Message-ID</dt><dd>{{ r.source.message_id or '—' }}</dd>
+          <dt>Sender domain</dt><dd>{{ r.sender.from_domain or '—' }}</dd>
+          <dt>Envelope from</dt><dd>{{ r.sender.envelope_from or '—' }}</dd>
+          <dt>Source</dt><dd>{{ r.source.type or 'email' }}{% if r.source.mailbox_id %} · {{ r.source.mailbox_id }}{% endif %}</dd>
+          <dt>URLs</dt><dd>{{ r.urls|length }}</dd>
+          <dt>Attachments</dt><dd>{{ r.attachments|length }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if r.recommended_actions %}
+    <div class="card">
+      <div class="card-h"><h3>Recommended actions</h3></div>
+      <div class="card-b"><ul class="small" style="margin:0;padding-left:18px;color:var(--muted)">{% for a in r.recommended_actions %}<li style="margin-bottom:6px">{{ a }}</li>{% endfor %}</ul></div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-h"><h3>Analyst feedback</h3></div>
+      <div class="card-b">
+        {% if feedback %}<div class="muted small" style="margin-bottom:12px">Recorded: {% for f in feedback %}<span class="pill">{{ f.label }}</span>{% endfor %}</div>{% endif %}
+        <form method="post">
+          <div class="field">
+            <label>Verdict label</label>
+            <select name="label">
+              <option value="">— no change —</option>
+              <option value="true_positive">True positive</option>
+              <option value="false_positive">False positive</option>
+              <option value="benign">Benign</option>
+              <option value="malicious">Malicious</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Note</label>
+            <input name="note" placeholder="Optional context for tuning">
+          </div>
+          <button class="btn btn-primary" type="submit">Save feedback</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

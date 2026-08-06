@@ -96,13 +96,13 @@ def analyze(email: ParsedEmail, ctx: AnalysisContext) -> AnalyzerResult:
             findings.append(make_finding(
                 NAME, "Suspicious TLD",
                 f"URL host '{host}' uses frequently-abused TLD '.{tld}'.",
-                Severity.MEDIUM, 10, {"url": url, "tld": tld}))
+                Severity.LOW, 4, {"url": url, "tld": tld}))
 
         if host in SHORTENERS:
             findings.append(make_finding(
                 NAME, "URL shortener",
                 f"URL '{url}' uses a shortening service; final destination is hidden.",
-                Severity.LOW, 5, {"url": url}))
+                Severity.LOW, 2, {"url": url}))
 
         for brand in ctx.org_profile.brand_domains:
             if is_lookalike(host, brand):

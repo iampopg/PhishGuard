@@ -123,9 +123,12 @@ def create_app(ctx: Optional[AnalysisContext] = None):
         ctx = _ctx()
         verdict = request.args.get("verdict")
         all_reports = _store(ctx.config).list_reports(limit=500)
+        counts = {"safe": 0, "suspicious": 0, "phishing": 0, "malicious": 0}
+        for r in all_reports:
+            counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
         if verdict:
             all_reports = [r for r in all_reports if r["verdict"] == verdict]
-        return render_template("reports.html", reports=all_reports, verdict=verdict)
+        return render_template("reports.html", reports=all_reports, verdict=verdict, counts=counts)
 
     @app.route("/report/<report_id>", methods=["GET", "POST"])
     @login_required

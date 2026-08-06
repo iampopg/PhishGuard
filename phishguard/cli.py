@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -99,7 +102,10 @@ def cmd_scan_mailbox(args, ctx: AnalysisContext) -> int:
     from phishguard.pipeline import analyze_email
     fetcher = MailFetcher(ctx.config)
     fetcher.connect()
-    items = fetcher.fetch_unseen(limit=args.limit)
+    if getattr(args, "all", False):
+        items = fetcher.fetch_all(limit=args.limit)
+    else:
+        items = fetcher.fetch_unseen(limit=args.limit)
     out = []
     for n, (uid, raw) in enumerate(items, 1):
         print(f"[scan-mailbox] {n}/{len(items)} uid={uid}", file=sys.stderr, flush=True)
@@ -113,14 +119,51 @@ def cmd_scan_mailbox(args, ctx: AnalysisContext) -> int:
 
 
 def cmd_serve(args, ctx: AnalysisContext) -> int:
-    try:
-        from phishguard.web.app import create_app
-    except ImportError as e:
-        print(f"Web dashboard unavailable: {e}", file=sys.stderr)
-        return 1
-    app = create_app()
-    app.run(host=args.host, port=args.port)
+    import uvicorn
+
+    web_out = Path(__file__).resolve().parent.parent / "web" / "out"
+    if not web_out.exists():
+        print("UI not built. Building Next.js app (first build may take a minute)...",
+              file=sys.stderr, flush=True)
+        if not _build_web():
+            print("Could not build the UI. Run `phishguard web build` manually, then `phishguard serve`.",
+                  file=sys.stderr)
+            return 1
+    print(f"PhishGuard serving on http://{args.host}:{args.port}", file=sys.stderr, flush=True)
+    uvicorn.run("phishguard.api.server:app", host=args.host, port=args.port, log_level="info")
     return 0
+
+
+def _run(cmd: list, cwd: Path) -> bool:
+    print(f"[build] {' '.join(cmd)}", file=sys.stderr, flush=True)
+    rc = subprocess.call(cmd, cwd=str(cwd))
+    return rc == 0
+
+
+def _build_web() -> bool:
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    if not (web_dir / "package.json").exists():
+        print("web/ project not found", file=sys.stderr)
+        return False
+    if shutil.which("npm") is None:
+        print("npm not found on PATH", file=sys.stderr)
+        return False
+    if not (web_dir / "node_modules").exists():
+        if not _run(["npm", "install"], cwd=web_dir):
+            return False
+    return _run(["npm", "run", "build"], cwd=web_dir)
+
+
+def cmd_web_build(args, ctx: AnalysisContext) -> int:
+    return 0 if _build_web() else 1
+
+
+def cmd_web_dev(args, ctx: AnalysisContext) -> int:
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    if not (web_dir / "node_modules").exists():
+        _run(["npm", "install"], cwd=web_dir)
+    os.chdir(web_dir)
+    return subprocess.call(["npm", "run", "dev"])
 
 
 def cmd_feeds(args, ctx: AnalysisContext) -> int:
@@ -148,14 +191,22 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("text")
     s.set_defaults(func=cmd_scan_text)
 
-    s = sub.add_parser("scan-mailbox", help="Scan unseen messages via IMAP")
+    s = sub.add_parser("scan-mailbox", help="Scan mailbox messages via IMAP")
     s.add_argument("--limit", type=int, default=50)
+    s.add_argument("--all", action="store_true", help="Scan all messages (not just unseen)")
     s.set_defaults(func=cmd_scan_mailbox)
 
-    s = sub.add_parser("serve", help="Run the web dashboard")
+    s = sub.add_parser("serve", help="Run API + built Next.js UI on one port")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8080)
     s.set_defaults(func=cmd_serve)
+
+    w = sub.add_parser("web", help="Next.js UI tooling")
+    ws = w.add_subparsers(dest="web_command", required=True)
+    wb = ws.add_parser("build", help="Install deps and build the static UI")
+    wb.set_defaults(func=cmd_web_build)
+    wd = ws.add_parser("dev", help="Run the Next.js dev server (hot reload)")
+    wd.set_defaults(func=cmd_web_dev)
 
     s = sub.add_parser("feeds", help="Pull free threat-intel feeds into the local cache")
     s.set_defaults(func=cmd_feeds)

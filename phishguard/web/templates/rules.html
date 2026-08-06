@@ -1,14 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Rules{% endblock %}
+{% block title %}Rules · PhishGuard{% endblock %}
+{% block page_title %}Detection Rules<small>Detections-as-code · actions on verdict</small>{% endblock %}
 {% block content %}
-<h2>Detection rules</h2>
-<p class="muted">Detections-as-code. Each rule fires an action when its condition matches a finding.</p>
-<table>
-  <tr><th>ID</th><th>Description</th><th>Action</th><th>Severity ≥</th></tr>
-  {% for r in rules %}
-  <tr><td><code>{{ r.id }}</code></td><td>{{ r.description }}</td><td><b>{{ r.action }}</b></td><td>{{ r.severity_at_least.value }}</td></tr>
-  {% endfor %}
-</table>
-<h3>Scoring thresholds</h3>
-<p class="muted">suspicious ≥ {{ cfg.threshold_suspicious }}, phishing ≥ {{ cfg.threshold_phishing }}, malicious ≥ {{ cfg.threshold_malicious }}</p>
+<div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+  <div class="card">
+    <div class="card-h"><h3>Scoring thresholds</h3></div>
+    <div class="card-b">
+      <div class="kv">
+        <dt>Suspicious ≥</dt><dd>{{ cfg.threshold_suspicious }}</dd>
+        <dt>Phishing ≥</dt><dd>{{ cfg.threshold_phishing }}</dd>
+        <dt>Malicious ≥</dt><dd>{{ cfg.threshold_malicious }}</dd>
+        <dt>BEC baseline</dt><dd>{{ cfg.behavioral_baseline_days }} days</dd>
+      </div>
+      <p class="muted small" style="margin-top:10px">Adjust in <a href="/settings">Settings</a>.</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>How rules work</h3></div>
+    <div class="card-b"><p class="muted small" style="margin:0">Each rule watches an analyzer's findings. When a finding meets the severity threshold, the linked <b>action</b> fires — quarantining, notifying the SOC, routing to review, or triggering training. Rules are code in <span class="mono">rules/defaults/*.yaml</span> and are fully auditable.</p></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>Active rules</h3><span class="sub">{{ rules|length }} loaded</span></div>
+  <div class="card-b" style="padding:0">
+    <table class="table">
+      <thead><tr><th>Rule</th><th>Scope</th><th>Condition</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for r in rules %}
+        <tr>
+          <td><b>{{ r.id }}</b><br><small class="muted">{{ r.description }}</small></td>
+          <td>{% if r.analyzer %}<span class="pill">{{ r.analyzer }}</span>{% else %}<span class="muted">any</span>{% endif %}</td>
+          <td class="small muted">severity ≥ <b style="color:var(--text)">{{ r.severity_at_least.value }}</b>{% if r.title_contains %} · title contains "{{ r.title_contains }}"{% endif %}</td>
+          <td><span class="sev {{ 'high' if r.action=='quarantine' else 'medium' if r.action in ('notify_soc','review') else 'info' }}">{{ r.action }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

@@ -5,6 +5,7 @@ import binascii
 import email
 import hashlib
 import re
+from email.header import decode_header, make_header
 from email.message import Message
 from typing import List, Optional
 
@@ -12,6 +13,16 @@ from phishguard.models import Attachment, AuthResult, ParsedEmail
 from phishguard.util.text import extract_urls, registrable_domain
 
 _HREF_RE = re.compile(r'href\s*=\s*["\']([^"\']+)', re.IGNORECASE)
+
+
+def _decode_mime(value: Optional[str]) -> Optional[str]:
+    """Decode RFC 2047 encoded words (e.g. =?UTF-8?B?...?=) to a readable string."""
+    if not value:
+        return value
+    try:
+        return str(make_header(decode_header(value)))
+    except Exception:
+        return value
 
 
 def _decode_payload(part: Message) -> bytes:
@@ -97,11 +108,11 @@ def parse_message(raw: bytes) -> ParsedEmail:
 
     return ParsedEmail(
         message_id=msg.get("Message-ID"),
-        subject=msg.get("Subject"),
+        subject=_decode_mime(msg.get("Subject")),
         from_header=msg.get("From"),
         to_header=msg.get("To"),
         date_header=msg.get("Date"),
-        sender_name=from_name,
+        sender_name=_decode_mime(from_name),
         sender_email=from_addr,
         sender_domain=sender_domain,
         receiver_email=to_addr,

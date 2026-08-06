@@ -1,51 +1,75 @@
 {% extends "base.html" %}
-{% block title %}Mailbox{% endblock %}
+{% block title %}Mailbox · PhishGuard{% endblock %}
+{% block page_title %}Mailbox<small>Read-only IMAP scanning &amp; continuous monitoring</small>{% endblock %}
 {% block content %}
-<h2>Mailbox (IMAP)</h2>
-<form method="post" class="card">
-  <input type="hidden" name="action" value="save">
-  <div class="row">
-    <div><label>IMAP server</label><input type="text" name="PG_IMAP_SERVER" value="{{ env.get('PG_IMAP_SERVER','') }}"></div>
-    <div><label>Username</label><input type="text" name="PG_IMAP_USERNAME" value="{{ env.get('PG_IMAP_USERNAME','') }}"></div>
+<div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+  <div class="card">
+    <div class="card-h"><h3>Connection</h3><span class="sub">credentials stored in .env</span></div>
+    <div class="card-b">
+      <form method="post">
+        <input type="hidden" name="action" value="save">
+        <div class="row row-2">
+          <div class="field"><label>IMAP server</label><input name="PG_IMAP_SERVER" value="{{ env.get('PG_IMAP_SERVER','') }}" placeholder="imap.gmail.com"></div>
+          <div class="field"><label>Port</label><input name="PG_IMAP_PORT" value="{{ env.get('PG_IMAP_PORT','993') }}"></div>
+        </div>
+        <div class="field"><label>Username</label><input name="PG_IMAP_USERNAME" value="{{ env.get('PG_IMAP_USERNAME','') }}" placeholder="you@example.com"></div>
+        <div class="field"><label>Password / app password</label><input type="password" name="PG_IMAP_PASSWORD" value="{{ env.get('PG_IMAP_PASSWORD','') }}" placeholder="••••••••"></div>
+        <div class="field"><label>Mailbox</label><input name="PG_IMAP_MAILBOX" value="{{ env.get('PG_IMAP_MAILBOX','INBOX') }}"></div>
+        <label class="check"><input type="checkbox" name="PG_IMAP_USE_SSL" {% if env.get('PG_IMAP_USE_SSL','true')=='true' %}checked{% endif %}><span>Use SSL/TLS</span></label>
+        <label class="check" style="margin-top:10px"><input type="checkbox" name="PG_IMAP_UNSEEN_ONLY" {% if env.get('PG_IMAP_UNSEEN_ONLY','true')=='true' %}checked{% endif %}><span>Unseen messages only</span></label>
+        <label class="check" style="margin-top:10px"><input type="checkbox" name="PG_IMAP_MARK_READ" {% if env.get('PG_IMAP_MARK_READ','false')=='true' %}checked{% endif %}><span>Mark as read after scan (off by default)</span></label>
+        <div class="actions" style="margin-top:16px"><button class="btn btn-primary" type="submit">Save configuration</button></div>
+      </form>
+    </div>
   </div>
-  <div class="row">
-    <div><label>Password / app password</label><input type="password" name="PG_IMAP_PASSWORD" value="{{ env.get('PG_IMAP_PASSWORD','') }}"></div>
-    <div><label>Mailbox</label><input type="text" name="PG_IMAP_MAILBOX" value="{{ env.get('PG_IMAP_MAILBOX','INBOX') }}"></div>
-    <div><label>Port</label><input type="number" name="PG_IMAP_PORT" value="{{ env.get('PG_IMAP_PORT','993') }}"></div>
+
+  <div class="grid" style="gap:18px">
+    <div class="card">
+      <div class="card-h"><h3>Scan now</h3><span class="sub">read-only</span></div>
+      <div class="card-b">
+        <form method="post">
+          <input type="hidden" name="action" value="scan">
+          <div class="field"><label>Messages to fetch</label><input type="number" name="limit" value="10" min="1" max="200"></div>
+          <button class="btn btn-primary" type="submit">Run mailbox scan</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Continuous monitor</h3></div>
+      <div class="card-b">
+        <div class="actions" style="margin-bottom:14px"><span class="pill"><span class="dot {% if not monitor %}warn{% endif %}" style="display:inline-block;margin-right:6px"></span>{% if monitor %}Running{% else %}Stopped{% endif %}</span></div>
+        <div class="row row-2">
+          <form method="post">
+            <input type="hidden" name="action" value="start_monitor">
+            <div class="field"><label>Interval (seconds)</label><input type="number" name="interval" value="{{ cfg.monitor_interval }}"></div>
+            <button class="btn btn-primary" type="submit">Start monitor</button>
+          </form>
+          <form method="post">
+            <input type="hidden" name="action" value="stop_monitor">
+            <div class="field"><label>&nbsp;</label><button class="btn btn-danger" type="submit" style="width:100%">Stop monitor</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
-  <p>
-    <label><input type="checkbox" name="PG_IMAP_USE_SSL" {% if env.get('PG_IMAP_USE_SSL','true')=='true' %}checked{% endif %}> Use SSL</label>
-    <label><input type="checkbox" name="PG_IMAP_UNSEEN_ONLY" {% if env.get('PG_IMAP_UNSEEN_ONLY','true')=='true' %}checked{% endif %}> Unseen only</label>
-    <label><input type="checkbox" name="PG_IMAP_MARK_READ" {% if env.get('PG_IMAP_MARK_READ','false')=='true' %}checked{% endif %}> Mark as read after scan</label>
-  </p>
-  <p><button type="submit">Save configuration</button></p>
-</form>
+</div>
 
-<form method="post" class="card">
-  <input type="hidden" name="action" value="scan">
-  <label>Scan N unseen messages now</label>
-  <input type="number" name="limit" value="10" min="1" max="200" style="max-width:120px">
-  <p><button type="submit">Scan now (read-only)</button></p>
-</form>
-
-<form method="post" class="card">
-  <input type="hidden" name="action" value="start_monitor">
-  <label>Monitor interval (seconds)</label>
-  <input type="number" name="interval" value="{{ cfg.monitor_interval }}" style="max-width:120px">
-  <p><button type="submit">Start monitor</button></p>
-</form>
-<form method="post" class="card">
-  <input type="hidden" name="action" value="stop_monitor">
-  <p><button class="btn sec" type="submit">Stop monitor</button></p>
-</form>
-
-{% if results is not none %}
-<h3>Scan results ({{ results | length }})</h3>
-<table><tr><th>Verdict</th><th>Score</th><th>Sender</th><th>Subject</th></tr>
-{% for r in results %}
-<tr><td><span class="badge {{ r.verdict }}">{{ r.verdict }}</span></td><td>{{ r.risk_score }}</td>
-<td>{{ (r.sender or {}).from }}</td><td>{{ (r.source or {}).subject }}</td></tr>
-{% endfor %}
-</table>
+{% if results %}
+<div class="card" style="margin-top:18px">
+  <div class="card-h"><h3>This scan ({{ results|length }})</h3></div>
+  <div class="card-b" style="padding:0">
+    <table class="table">
+      <thead><tr><th>Subject</th><th>Sender</th><th>Verdict</th><th>Score</th></tr></thead>
+      <tbody>
+      {% for r in results %}
+        <tr><td><a class="subj" href="/report/{{ r.report_id }}">{{ r.source.subject or '(no subject)' }}</a></td>
+            <td>{{ r.sender.from }}</td>
+            <td><span class="badge {{ r.verdict.value }}"><span class="bdot"></span>{{ r.verdict.value|capitalize }}</span></td>
+            <td><span class="score-pill">{{ r.risk_score }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

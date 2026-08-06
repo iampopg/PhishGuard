@@ -7,9 +7,16 @@ __pycache__/
 .env.*
 !.env.example
 reports/
+emls/
 .cache/
 *.db
 *.db-journal
 *.egg-info/
 dist/
 build/
+# Next.js UI build artifacts
+web/node_modules/
+web/out/
+web/.next/
+web/package-lock.json
+

@@ -1,26 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Export{% endblock %}
+{% block title %}Export · PhishGuard{% endblock %}
+{% block page_title %}Export / SIEM<small>Stream detections to your stack</small>{% endblock %}
 {% block content %}
-<h2>SIEM / SOAR export</h2>
-<p class="muted">Send analysis results to a SIEM via syslog (CEF or JSON) or a webhook. Gated by minimum severity.</p>
-<form method="post" class="card">
-  <input type="hidden" name="action" value="save">
-  <label><input type="checkbox" name="PG_EXPORT_ENABLED" {% if env.get('PG_EXPORT_ENABLED','false')=='true' %}checked{% endif %}> Enable export</label>
-  <label><input type="checkbox" name="PG_EXPORT_CEF" {% if env.get('PG_EXPORT_CEF','false')=='true' %}checked{% endif %}> Use CEF format (else JSON)</label>
-  <label>Syslog address (host:port, UDP)</label>
-  <input type="text" name="PG_EXPORT_SYSLOG_ADDR" value="{{ env.get('PG_EXPORT_SYSLOG_ADDR','') }}" placeholder="siem.example.com:514">
-  <label>Webhook URL</label>
-  <input type="text" name="PG_EXPORT_WEBHOOK_URL" value="{{ env.get('PG_EXPORT_WEBHOOK_URL','') }}">
-  <label>Minimum severity</label>
-  <select name="PG_EXPORT_MIN_SEVERITY">
-    {% for s in ['low','medium','high','critical'] %}
-    <option value="{{ s }}" {% if env.get('PG_EXPORT_MIN_SEVERITY','medium')==s %}selected{% endif %}>{{ s }}</option>
-    {% endfor %}
-  </select>
-  <p><button type="submit">Save export config</button></p>
-</form>
-<form method="post" class="card">
-  <input type="hidden" name="action" value="test">
-  <p><button class="btn sec" type="submit">Send test export (most recent report)</button></p>
-</form>
+<div class="card" style="max-width:820px">
+  <div class="card-h"><h3>Destinations</h3><span class="sub">disabled by default</span></div>
+  <div class="card-b">
+    <form method="post">
+      <label class="check" style="margin-bottom:14px"><input type="checkbox" name="PG_EXPORT_ENABLED" {% if env.get('PG_EXPORT_ENABLED','false')=='true' %}checked{% endif %}><span>Enable export on every analysis</span></label>
+      <label class="check" style="margin-bottom:14px"><input type="checkbox" name="PG_EXPORT_CEF" {% if env.get('PG_EXPORT_CEF','true')=='true' %}checked{% endif %}><span>Syslog format: CEF (else JSON)</span></label>
+      <div class="row row-2">
+        <div class="field"><label>Syslog address</label><input name="PG_EXPORT_SYSLOG_ADDR" value="{{ env.get('PG_EXPORT_SYSLOG_ADDR','') }}" placeholder="udp://localhost:514"></div>
+        <div class="field"><label>Webhook URL</label><input name="PG_EXPORT_WEBHOOK_URL" value="{{ env.get('PG_EXPORT_WEBHOOK_URL','') }}" placeholder="https://hooks.example.com/..."></div>
+      </div>
+      <div class="field"><label>Minimum severity to export</label>
+        <select name="PG_EXPORT_MIN_SEVERITY">
+          {% for s in ['low','medium','high','critical'] %}<option value="{{ s }}" {% if env.get('PG_EXPORT_MIN_SEVERITY','medium')==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select></div>
+      <div class="actions">
+        <button class="btn btn-primary" type="submit" name="action" value="save">Save configuration</button>
+        <button class="btn btn-ghost" type="submit" name="action" value="test">Send test export</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}

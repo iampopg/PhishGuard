@@ -72,6 +72,9 @@ def analyze_email(
         attachments=parsed.attachments,
         recommended_actions=[],
         labels={"org": ctx.org_profile.protected_domains},
+        raw_headers=parsed.raw_headers,
+        body_text=parsed.body_text,
+        body_html=parsed.body_html,
     )
 
     actions = list(recommended_actions(verdict)) + evaluate_rules(report, rules)

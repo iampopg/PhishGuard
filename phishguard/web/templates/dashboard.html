@@ -1,26 +1,75 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard · PhishGuard{% endblock %}
+{% block page_title %}Dashboard<small>Real-time overview of analyzed mail (local store)</small>{% endblock %}
 {% block content %}
-<h2>Dashboard</h2>
-<div class="stats">
-  <div class="stat"><b>{{ counts.safe }}</b>Safe</div>
-  <div class="stat"><b>{{ counts.suspicious }}</b>Suspicious</div>
-  <div class="stat"><b>{{ counts.phishing }}</b>Phishing</div>
-  <div class="stat"><b>{{ counts.malicious }}</b>Malicious</div>
+{% set total = counts.values()|sum %}
+{% set threats = counts.phishing + counts.malicious + counts.suspicious %}
+{% set last = recent[0].timestamp if recent else "—" %}
+<div class="grid grid-4" style="margin-bottom:18px">
+  <div class="stat"><div class="label">Total analyzed</div><div class="value">{{ total }}</div><div class="meta">Stored locally · offline</div></div>
+  <div class="stat malicious"><div class="label">Threats</div><div class="value">{{ threats }}</div><div class="meta">{{ ((threats/total*100)|round(1)) if total else 0 }}% of traffic</div></div>
+  <div class="stat phishing"><div class="label">Phishing</div><div class="value">{{ counts.phishing }}</div><div class="meta">confirmed / likely</div></div>
+  <div class="stat malicious"><div class="label">Malicious</div><div class="value">{{ counts.malicious }}</div><div class="meta">high-confidence</div></div>
 </div>
-<p class="muted">Live monitor: {% if monitor %}<b style="color:#6ee7b7">running</b>{% else %}stopped{% endif %}</p>
-<h3>Recent analyses</h3>
-<table>
-  <tr><th>Time</th><th>Verdict</th><th>Score</th><th>Sender</th><th>Subject</th></tr>
-  {% for r in recent %}
-  <tr>
-    <td class="muted">{{ r.timestamp[:19] }}</td>
-    <td><span class="badge {{ r.verdict }}">{{ r.verdict }}</span></td>
-    <td>{{ r.risk_score }}</td>
-    <td>{{ (r.sender or {}).from }}</td>
-    <td>{{ (r.source or {}).subject }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<p><a class="btn" href="/scan">Scan a message</a> <a class="btn sec" href="/mailbox">Scan mailbox</a></p>
+
+<div class="grid" style="grid-template-columns:1.6fr 1fr;align-items:start">
+  <div class="card">
+    <div class="card-h"><h3>Recent analyses</h3><a class="btn btn-ghost btn-sm" href="/reports">View all</a></div>
+    <div class="card-b" style="padding:0">
+      {% if recent %}
+      <table class="table">
+        <thead><tr><th>Subject</th><th>Sender</th><th>Verdict</th><th>Score</th><th>Time</th></tr></thead>
+        <tbody>
+        {% for r in recent %}
+          <tr>
+            <td><a class="subj" href="/report/{{ r.report_id }}">{{ r.source.subject or '(no subject)' }}</a>
+                <small class="mono">{{ r.report_id }}</small></td>
+            <td>{{ r.sender.display_name or r.sender.from }}<br><small class="muted">{{ r.sender.from }}</small></td>
+            <td><span class="badge {{ r.verdict }}"><span class="bdot"></span>{{ r.verdict|capitalize }}</span></td>
+            <td><span class="score-pill">{{ r.risk_score }}</span></td>
+            <td class="muted small">{{ r.timestamp[:19]|replace('T',' ') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">No analyses yet. Run a <a href="/scan">scan</a> or connect a <a href="/mailbox">mailbox</a>.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid" style="gap:18px">
+    <div class="card">
+      <div class="card-h"><h3>Verdict distribution</h3></div>
+      <div class="card-b">
+        <div class="vbar">
+          <span class="safe" style="width:{{ (counts.safe/total*100) if total else 0 }}%"></span>
+          <span class="suspicious" style="width:{{ (counts.suspicious/total*100) if total else 0 }}%"></span>
+          <span class="phishing" style="width:{{ (counts.phishing/total*100) if total else 0 }}%"></span>
+          <span class="malicious" style="width:{{ (counts.malicious/total*100) if total else 0 }}%"></span>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--safe)"></i>Safe {{ counts.safe }}</span>
+          <span><i style="background:var(--suspicious)"></i>Suspicious {{ counts.suspicious }}</span>
+          <span><i style="background:var(--phishing)"></i>Phishing {{ counts.phishing }}</span>
+          <span><i style="background:var(--malicious)"></i>Malicious {{ counts.malicious }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Monitor</h3></div>
+      <div class="card-b">
+        <div class="actions" style="margin-bottom:12px">
+          <span class="pill"><span class="dot {% if not monitor %}warn{% endif %}" style="display:inline-block;margin-right:6px"></span>{% if monitor %}Running{% else %}Stopped{% endif %}</span>
+          <span class="pill">Last scan: {{ last[:19]|replace('T',' ') if recent else '—' }}</span>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary btn-sm" href="/scan"><svg class="ico" style="width:15px;height:15px"><use href="#i-scan"/></svg>New scan</a>
+          <a class="btn btn-ghost btn-sm" href="/mailbox">Mailbox</a>
+          <a class="btn btn-ghost btn-sm" href="/feeds">Feeds</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

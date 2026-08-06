@@ -1,25 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Reports{% endblock %}
+{% block title %}Reports · PhishGuard{% endblock %}
+{% block page_title %}Reports<small>{{ reports|length }} analysis{{ '' if reports|length==1 else 'es' }} in local store</small>{% endblock %}
 {% block content %}
-<h2>Reports</h2>
-<p class="muted">Filter:
-  <a href="/reports">all</a> ·
-  <a href="/reports?verdict=safe">safe</a> ·
-  <a href="/reports?verdict=suspicious">suspicious</a> ·
-  <a href="/reports?verdict=phishing">phishing</a> ·
-  <a href="/reports?verdict=malicious">malicious</a>
-</p>
-<table>
-  <tr><th>ID</th><th>Time</th><th>Verdict</th><th>Score</th><th>Sender</th><th>Subject</th></tr>
-  {% for r in reports %}
-  <tr>
-    <td><a href="/report/{{ r.report_id }}">{{ r.report_id[:8] }}</a></td>
-    <td class="muted">{{ r.timestamp[:19] }}</td>
-    <td><span class="badge {{ r.verdict }}">{{ r.verdict }}</span></td>
-    <td>{{ r.risk_score }}</td>
-    <td>{{ (r.sender or {}).from }}</td>
-    <td>{{ (r.source or {}).subject }}</td>
-  </tr>
-  {% endfor %}
-</table>
+<div class="card">
+  <div class="card-h">
+    <h3>Analysis history</h3>
+    <div class="chips">
+      <a class="chip {% if not verdict %}active{% endif %}" href="/reports">All <span class="c">{{ counts.values()|sum }}</span></a>
+      <a class="chip {% if verdict=='safe' %}active{% endif %}" href="/reports?verdict=safe">Safe <span class="c">{{ counts.safe }}</span></a>
+      <a class="chip {% if verdict=='suspicious' %}active{% endif %}" href="/reports?verdict=suspicious">Suspicious <span class="c">{{ counts.suspicious }}</span></a>
+      <a class="chip {% if verdict=='phishing' %}active{% endif %}" href="/reports?verdict=phishing">Phishing <span class="c">{{ counts.phishing }}</span></a>
+      <a class="chip {% if verdict=='malicious' %}active{% endif %}" href="/reports?verdict=malicious">Malicious <span class="c">{{ counts.malicious }}</span></a>
+    </div>
+  </div>
+  <div class="card-b" style="padding:0">
+    {% if reports %}
+    <table class="table">
+      <thead><tr><th>Subject</th><th>Sender</th><th>Verdict</th><th>Score</th><th>Analyzers</th><th>Time</th></tr></thead>
+      <tbody>
+      {% for r in reports %}
+        <tr>
+          <td><a class="subj" href="/report/{{ r.report_id }}">{{ r.source.subject or '(no subject)' }}</a>
+              <small class="mono">{{ r.report_id }}</small></td>
+          <td>{{ r.sender.display_name or r.sender.from }}<br><small class="muted">{{ r.sender.from }}</small></td>
+          <td><span class="badge {{ r.verdict }}"><span class="bdot"></span>{{ r.verdict|capitalize }}</span></td>
+          <td><span class="score-pill">{{ r.risk_score }}</span></td>
+          <td class="muted small">{{ r.analyzers|length }} engines</td>
+          <td class="muted small">{{ r.timestamp[:19]|replace('T',' ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No reports match this filter.</div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

@@ -1,19 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Org Profile{% endblock %}
+{% block title %}Org Profile · PhishGuard{% endblock %}
+{% block page_title %}Organization Profile<small>Tunes detection to your people &amp; brands</small>{% endblock %}
 {% block content %}
-<h2>Organization profile</h2>
-<p class="muted">Saved to <code>{{ path }}</code>. Used for lookalike / brand-impersonation / VIP detection.</p>
-<form method="post" class="card">
-  <label>Protected domains (your org, comma-separated)</label>
-  <textarea name="protected_domains">{{ org.protected_domains | join(", ") }}</textarea>
-  <label>Brand domains to protect (e.g. paypal.com)</label>
-  <textarea name="brand_domains">{{ org.brand_domains | join(", ") }}</textarea>
-  <label>Brand keywords (display-name cues)</label>
-  <textarea name="brand_keywords">{{ org.brand_keywords | join(", ") }}</textarea>
-  <label>VIP names (internal people impersonated in BEC)</label>
-  <textarea name="vip_names">{{ org.vip_names | join(", ") }}</textarea>
-  <label>Trusted domains (lower scrutiny)</label>
-  <textarea name="trusted_domains">{{ org.trusted_domains | join(", ") }}</textarea>
-  <p><button type="submit">Save profile</button></p>
-</form>
+<div class="card" style="max-width:820px">
+  <div class="card-h"><h3>Context</h3><span class="sub">{{ path }}</span></div>
+  <div class="card-b">
+    <form method="post">
+      <div class="field"><label>Protected domains (your org)</label>
+        <input name="protected_domains" value="{{ org.protected_domains|join(', ') }}">
+        <div class="hint">Comma-separated. Impersonation of these is flagged as high-risk.</div></div>
+      <div class="field"><label>VIP names (executives / finance)</label>
+        <input name="vip_names" value="{{ org.vip_names|join(', ') }}">
+        <div class="hint">Names used in BEC / whale-phishing detection.</div></div>
+      <div class="field"><label>Brand keywords</label>
+        <input name="brand_keywords" value="{{ org.brand_keywords|join(', ') }}"></div>
+      <div class="field"><label>Brand domains</label>
+        <input name="brand_domains" value="{{ org.brand_domains|join(', ') }}"></div>
+      <div class="field"><label>Trusted domains</label>
+        <input name="trusted_domains" value="{{ org.trusted_domains|join(', ') }}">
+        <div class="hint">Domains treated as lower-risk senders.</div></div>
+      <button class="btn btn-primary" type="submit">Save profile</button>
+    </form>
+  </div>
+</div>
 {% endblock %}

@@ -3,62 +3,245 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PhishGuard — {% block title %}Console{% endblock %}</title>
+<title>{% block title %}PhishGuard{% endblock %}</title>
 <style>
-  :root { color-scheme: dark; }
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#0f172a; color:#e2e8f0; }
-  header { background:#111827; padding:10px 18px; border-bottom:1px solid #1f2937; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
-  header a { color:#cbd5e1; text-decoration:none; font-size:14px; padding:4px 8px; border-radius:6px; }
-  header a:hover { background:#1f2937; color:#fff; }
-  header .brand { color:#38bdf8; font-weight:700; margin-right:8px; }
-  header .right { margin-left:auto; color:#94a3b8; font-size:13px; }
-  .wrap { padding:18px; max-width:1100px; margin:auto; }
-  h1,h2,h3 { font-weight:600; }
-  table { width:100%; border-collapse:collapse; margin-top:10px; }
-  th,td { text-align:left; padding:7px 8px; border-bottom:1px solid #1f2937; font-size:14px; }
-  .badge { padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
-  .safe{background:#064e3b;color:#6ee7b7;} .suspicious{background:#713f12;color:#fde68a;}
-  .phishing{background:#7c2d12;color:#fdba74;} .malicious{background:#7f1d1d;color:#fca5a5;}
-  .card { background:#111827; border:1px solid #1f2937; border-radius:8px; padding:14px; margin-top:12px; }
-  label { display:block; margin:8px 0 3px; font-size:13px; color:#94a3b8; }
-  input[type=text], input[type=password], input[type=number], textarea, select {
-    width:100%; background:#0f172a; color:#e2e8f0; border:1px solid #334155; padding:7px; border-radius:6px; box-sizing:border-box; font-size:14px; }
-  .row { display:flex; gap:14px; flex-wrap:wrap; }
-  .row > div { flex:1; min-width:220px; }
-  button, .btn { background:#0ea5e9; color:#04121f; border:0; padding:8px 14px; border-radius:6px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-block; }
-  .btn.sec { background:#334155; color:#e2e8f0; }
-  .flash { background:#1e3a8a; color:#dbeafe; padding:8px 12px; border-radius:6px; margin:10px 0; font-size:14px; }
-  .stats { display:flex; gap:12px; flex-wrap:wrap; }
-  .stat { background:#111827; border:1px solid #1f2937; border-radius:8px; padding:12px 16px; min-width:120px; }
-  .stat b { font-size:22px; display:block; }
-  .muted { color:#94a3b8; font-size:13px; }
-  code { background:#0f172a; padding:1px 4px; border-radius:4px; }
-  ul.findings { font-size:13px; }
-  ul.findings li { margin-bottom:4px; }
+  :root{
+    --bg:#0a0e16; --bg2:#0e1320; --surface:#141b2b; --surface2:#1a2233;
+    --border:#222c40; --border2:#2c3852;
+    --text:#e7edf6; --muted:#90a0b8; --muted2:#5f7088;
+    --accent:#3b82f6; --accent2:#06b6d4; --accent-grad:linear-gradient(135deg,#3b82f6,#06b6d4);
+    --safe:#10b981; --suspicious:#f59e0b; --phishing:#f97316; --malicious:#ef4444;
+    --info:#38bdf8; --low:#64748b; --medium:#f59e0b; --high:#f97316; --critical:#ef4444;
+    --radius:14px; --radius-sm:9px; --shadow:0 10px 30px rgba(0,0,0,.35);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 80% -10%,rgba(59,130,246,.08),transparent),var(--bg);
+    color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  svg{display:block}
+
+  /* layout */
+  .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  .sidebar{background:linear-gradient(180deg,var(--bg2),var(--bg));border-right:1px solid var(--border);
+    display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .brand{display:flex;align-items:center;gap:11px;padding:20px 20px 16px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:var(--accent-grad);display:grid;place-items:center;color:#fff;font-weight:800;box-shadow:0 6px 16px rgba(59,130,246,.4)}
+  .brand .name{font-weight:700;font-size:16px;letter-spacing:.2px}
+  .brand .sub{font-size:11px;color:var(--muted2);letter-spacing:.4px;text-transform:uppercase}
+  .nav{padding:6px 12px;display:flex;flex-direction:column;gap:3px}
+  .nav .group{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted2);padding:14px 12px 6px}
+  .nav-link{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:var(--muted);
+    font-weight:500;font-size:13.5px;transition:.15s;border:1px solid transparent}
+  .nav-link:hover{background:var(--surface);color:var(--text)}
+  .nav-link.active{background:linear-gradient(90deg,rgba(59,130,246,.18),rgba(59,130,246,.02));
+    color:#fff;border-color:var(--border2)}
+  .nav-link.active .ico{color:var(--accent)}
+  .nav-link .ico{width:18px;height:18px;color:var(--muted2);flex:0 0 auto}
+  .side-foot{margin-top:auto;padding:14px 18px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border)}
+  .side-foot b{color:var(--muted)}
+
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+    padding:14px 26px;background:rgba(10,14,22,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+  .page-title{font-size:18px;font-weight:700}
+  .page-title small{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:1px}
+  .top-actions{display:flex;align-items:center;gap:12px}
+  .env-pill{font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);
+    padding:5px 10px;border-radius:20px;display:flex;align-items:center;gap:7px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--safe);box-shadow:0 0 8px var(--safe)}
+  .dot.warn{background:var(--suspicious);box-shadow:0 0 8px var(--suspicious)}
+  .user-chip{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:grid;place-items:center;font-weight:700;color:var(--accent)}
+  .content{padding:26px;max-width:1320px;width:100%}
+
+  /* cards */
+  .card{background:linear-gradient(180deg,var(--surface),var(--surface2));border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .card-h{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border)}
+  .card-h h3{margin:0;font-size:14px;font-weight:650;letter-spacing:.2px}
+  .card-h .sub{font-size:12px;color:var(--muted)}
+  .card-b{padding:18px}
+  .grid{display:grid;gap:18px}
+  .grid-2{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  .grid-auto{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  @media(max-width:1000px){.grid-3,.grid-4{grid-template-columns:repeat(2,1fr)}.app{grid-template-columns:1fr}.sidebar{display:none}}
+  @media(max-width:640px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+
+  /* stat tiles */
+  .stat{position:relative;background:linear-gradient(180deg,var(--surface),var(--surface2));border:1px solid var(--border);
+    border-radius:var(--radius);padding:16px 16px 14px;overflow:hidden}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .stat.safe::before{background:var(--safe)} .stat.suspicious::before{background:var(--suspicious)}
+  .stat.phishing::before{background:var(--phishing)} .stat.malicious::before{background:var(--malicious)}
+  .stat .label{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .stat .value{font-size:30px;font-weight:750;margin-top:4px;line-height:1}
+  .stat .meta{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* badges */
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:650;border:1px solid transparent}
+  .badge .bdot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .badge.safe{color:var(--safe);background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3)}
+  .badge.suspicious{color:var(--suspicious);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3)}
+  .badge.phishing{color:var(--phishing);background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.3)}
+  .badge.malicious{color:var(--malicious);background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.35)}
+  .sev{display:inline-flex;align-items:center;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .sev.info{color:var(--info);background:rgba(56,189,248,.12)}
+  .sev.low{color:var(--low);background:rgba(100,116,139,.18)}
+  .sev.medium{color:var(--medium);background:rgba(245,158,11,.14)}
+  .sev.high{color:var(--high);background:rgba(249,115,22,.14)}
+  .sev.critical{color:var(--critical);background:rgba(239,68,68,.16)}
+
+  /* tables */
+  .table{width:100%;border-collapse:collapse;font-size:13px}
+  .table th{text-align:left;padding:11px 14px;color:var(--muted);font-weight:600;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0}
+  .table td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .table tbody tr{transition:.12s}
+  .table tbody tr:hover{background:var(--surface)}
+  .table .mono{font-family:var(--mono);color:var(--muted)}
+  .subj{font-weight:600;color:var(--text)}
+  .subj small{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .score-pill{font-family:var(--mono);font-weight:700;padding:2px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border2)}
+
+  /* distribution bar */
+  .vbar{display:flex;height:14px;border-radius:8px;overflow:hidden;background:var(--surface2);border:1px solid var(--border)}
+  .vbar span{display:block;height:100%}
+  .vbar .safe{background:var(--safe)} .vbar .suspicious{background:var(--suspicious)}
+  .vbar .phishing{background:var(--phishing)} .vbar .malicious{background:var(--malicious)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:middle}
+
+  /* forms */
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .field .hint{font-size:11.5px;color:var(--muted2);margin-top:4px}
+  input,select,textarea{width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);
+    border-radius:var(--radius-sm);padding:10px 12px;font-size:13.5px;font-family:inherit;transition:.15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+  textarea{min-height:120px;resize:vertical;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+  .row{display:grid;gap:14px}
+  .row-2{grid-template-columns:1fr 1fr} .row-3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:640px){.row-2,.row-3{grid-template-columns:1fr}}
+  .check{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg2);cursor:pointer}
+  .check input{width:auto}
+  .check span{font-size:13px}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;justify-content:center;border:1px solid var(--border2);
+    background:var(--surface2);color:var(--text);padding:9px 15px;border-radius:var(--radius-sm);font-weight:600;font-size:13px;cursor:pointer;transition:.15s;font-family:inherit}
+  .btn:hover{background:var(--border)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:var(--accent-grad);border:none;color:#fff;box-shadow:0 6px 16px rgba(59,130,246,.3)}
+  .btn-primary:hover{filter:brightness(1.08)}
+  .btn-danger{background:linear-gradient(135deg,#ef4444,#b91c1c);border:none;color:#fff}
+  .btn-danger:hover{filter:brightness(1.08)}
+  .btn-ghost{background:transparent;border-color:var(--border2);color:var(--muted)}
+  .btn-ghost:hover{color:var(--text);border-color:var(--accent)}
+  .btn-sm{padding:6px 11px;font-size:12px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+  /* alerts */
+  .alert{padding:11px 15px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:13px;border:1px solid;display:flex;gap:9px;align-items:center}
+  .alert.ok{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#9be7c4}
+  .alert.err{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#f3b4b4}
+  .alert.info{background:rgba(56,189,248,.08);border-color:rgba(56,189,248,.25);color:#aee4fb}
+
+  /* misc */
+  .muted{color:var(--muted)} .small{font-size:12px} .right{text-align:right} .center{text-align:center}
+  .pill{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted)}
+  .empty{padding:34px;text-align:center;color:var(--muted2)}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:8px 14px;font-size:13px}
+  .kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--mono);word-break:break-all}
+  .finding{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;background:var(--bg2);margin-bottom:10px}
+  .finding .ft{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .finding .ft b{font-size:13.5px} .finding .fd{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .analyzer-block{margin-bottom:14px}
+  .analyzer-block h4{margin:0 0 8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .analyzer-block h4 .sc{font-family:var(--mono);color:var(--text)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);color:var(--muted);font-size:12.5px;font-weight:600}
+  .chip.active{background:var(--accent-grad);color:#fff;border:none}
+  .chip .c{opacity:.7;margin-left:5px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px}
+  .tab{padding:10px 16px;cursor:pointer;color:var(--muted);font-weight:600;font-size:13px;border-bottom:2px solid transparent}
+  .tab.active{color:#fff;border-bottom-color:var(--accent)}
+  .tabpane{display:none} .tabpane.active{display:block}
+  .ring{--p:0;width:78px;height:78px;border-radius:50%;display:grid;place-items:center;
+    background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--surface2) 0);position:relative}
+  .ring::after{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--surface)}
+  .ring b{position:relative;z-index:1;font-size:20px;font-family:var(--mono)}
+  .hero{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;
+    background:radial-gradient(800px 400px at 50% -10%,rgba(59,130,246,.12),transparent),var(--bg)}
+  .login-card{width:380px;max-width:100%}
+  .login-card .brand{justify-content:center;padding:0 0 18px}
 </style>
 </head>
 <body>
-<header>
-  <span class="brand">PhishGuard</span>
-  <a href="/">Dashboard</a>
-  <a href="/reports">Reports</a>
-  <a href="/scan">Scan</a>
-  <a href="/mailbox">Mailbox</a>
-  <a href="/feeds">Feeds</a>
-  <a href="/org">Org Profile</a>
-  <a href="/rules">Rules</a>
-  <a href="/remediation">Remediation</a>
-  <a href="/export">Export</a>
-  <a href="/settings">Settings</a>
-  <span class="right"><a href="/logout">Logout</a></span>
-</header>
-<div class="wrap">
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
-    {% endif %}
-  {% endwith %}
-  {% block content %}{% endblock %}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-reports" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-mailbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></symbol>
+  <symbol id="i-feeds" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></symbol>
+  <symbol id="i-org" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="1.5"/><line x1="9" y1="7" x2="9" y2="7"/><line x1="15" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="9" y2="11"/><line x1="15" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="9" y2="15"/><line x1="15" y1="15" x2="15" y2="15"/></symbol>
+  <symbol id="i-rules" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+  <symbol id="i-remediation" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+</svg>
+
+{% if not g.get("hide_chrome") %}
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div><div class="name">PhishGuard</div><div class="sub">Detection Engine</div></div>
+    </div>
+    <nav class="nav">
+      <a class="nav-link {% if request.path=='/' %}active{% endif %}" href="/"><svg class="ico"><use href="#i-dash"/></svg>Dashboard</a>
+      <a class="nav-link {% if request.path.startswith('/reports') %}active{% endif %}" href="/reports"><svg class="ico"><use href="#i-reports"/></svg>Reports</a>
+      <a class="nav-link {% if request.path.startswith('/scan') %}active{% endif %}" href="/scan"><svg class="ico"><use href="#i-scan"/></svg>Scan</a>
+      <div class="group">Operations</div>
+      <a class="nav-link {% if request.path.startswith('/mailbox') %}active{% endif %}" href="/mailbox"><svg class="ico"><use href="#i-mailbox"/></svg>Mailbox</a>
+      <a class="nav-link {% if request.path.startswith('/feeds') %}active{% endif %}" href="/feeds"><svg class="ico"><use href="#i-feeds"/></svg>Threat Feeds</a>
+      <a class="nav-link {% if request.path.startswith('/remediation') %}active{% endif %}" href="/remediation"><svg class="ico"><use href="#i-remediation"/></svg>Remediation</a>
+      <a class="nav-link {% if request.path.startswith('/export') %}active{% endif %}" href="/export"><svg class="ico"><use href="#i-export"/></svg>Export / SIEM</a>
+      <div class="group">Configuration</div>
+      <a class="nav-link {% if request.path.startswith('/org') %}active{% endif %}" href="/org"><svg class="ico"><use href="#i-org"/></svg>Org Profile</a>
+      <a class="nav-link {% if request.path.startswith('/rules') %}active{% endif %}" href="/rules"><svg class="ico"><use href="#i-rules"/></svg>Rules</a>
+      <a class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings"><svg class="ico"><use href="#i-settings"/></svg>Settings</a>
+    </nav>
+    <div class="side-foot">Offline-first · data stays local<br><b>v1.0</b> · community build</div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="page-title">{% block page_title %}PhishGuard{% endblock %}</div>
+      <div class="top-actions">
+        <span class="env-pill"><span class="dot {% if not monitor %}warn{% endif %}"></span>{% if monitor %}Monitor live{% else %}Monitor off{% endif %}</span>
+        <div class="user-chip"><div class="avatar">{{ (current_user.id or 'A')[0]|upper }}</div>{{ current_user.id }}</div>
+        <a class="btn btn-ghost btn-sm" href="/logout"><svg class="ico" style="width:15px;height:15px"><use href="#i-logout"/></svg>Logout</a>
+      </div>
+    </header>
+    <main class="content">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for m in messages %}
+            <div class="alert {% if 'saved' in m or 'sent' in m or 'updated' in m %}ok{% elif 'Invalid' in m %}err{% else %}info{% endif %}">{{ m }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </div>
+{% endif %}
+{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,14 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Feeds{% endblock %}
+{% block title %}Threat Feeds · PhishGuard{% endblock %}
+{% block page_title %}Threat Feeds<small>Free blocklists: URLhaus &amp; OpenPhish</small>{% endblock %}
 {% block content %}
-<h2>Threat-intel feeds</h2>
-<p class="muted">Free feeds (URLhaus, OpenPhish) are pulled into the local cache and used by the URL scanner.
-VirusTotal / Google Safe Browsing enrichment is configured under Settings.</p>
-<form method="post"><button type="submit">Update feeds now</button></form>
-{% if info %}
-<p>Last update: <b>{{ info.time }}</b></p>
-<p>Counts: URLhaus {{ info.counts.urlhaus }}, OpenPhish {{ info.counts.openphish }}</p>
-{% else %}
-<p class="muted">Feeds not updated yet this session.</p>
-{% endif %}
+<div class="card" style="max-width:760px">
+  <div class="card-h">
+    <h3>Intelligence sources</h3>
+    <form method="post" style="margin:0"><button class="btn btn-primary btn-sm" type="submit">Update now</button></form>
+  </div>
+  <div class="card-b">
+    {% if info and info.counts %}
+      <div class="alert ok" style="margin-bottom:16px">Last updated {{ info.time }}</div>
+      <div class="kv">
+        {% for name, n in info.counts.items() %}
+        <dt>{{ name }}</dt><dd>{{ n }} indicators loaded</dd>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty" style="padding:10px 0 18px">Feeds not fetched yet. Click <b>Update now</b> to pull the latest free blocklists into the local cache.</div>
+    {% endif %}
+    <p class="muted small" style="margin-top:8px">These lists power offline URL/domain reputation checks. Optional VirusTotal &amp; Google Safe Browsing enrichment can be enabled in Settings.</p>
+  </div>
+</div>
 {% endblock %}
