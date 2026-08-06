@@ -44,17 +44,17 @@ export default function SettingsPage() {
       autoTested.current.add(p);
       runTest(p, payload, flag);
     };
-    if (env.PG_VT_API_KEY && env.PG_VT_ENABLED !== "true")
+    if (env.PG_VT_API_KEY)
       tryAuto("vt", { provider: "vt", key: env.PG_VT_API_KEY }, "PG_VT_ENABLED");
-    if (env.PG_GSB_API_KEY && env.PG_GSB_ENABLED !== "true")
+    if (env.PG_GSB_API_KEY)
       tryAuto("gsb", { provider: "gsb", key: env.PG_GSB_API_KEY }, "PG_GSB_ENABLED");
-    if (env.PG_CLAMAV_HOST && env.PG_CLAMAV_ENABLED !== "true")
+    if (env.PG_CLAMAV_HOST)
       tryAuto("clamav", { provider: "clamav", host: env.PG_CLAMAV_HOST }, "PG_CLAMAV_ENABLED");
-    if (env.PG_SANDBOX_API_KEY && env.PG_SANDBOX_URL && env.PG_SANDBOX_ENABLED !== "true")
+    if (env.PG_SANDBOX_API_KEY && env.PG_SANDBOX_URL)
       tryAuto("sandbox", { provider: "sandbox", key: env.PG_SANDBOX_API_KEY, url: env.PG_SANDBOX_URL }, "PG_SANDBOX_ENABLED");
   }, [env]);
 
-  const bv = (k: string) => env[k] === "true" || cfg[k] === true;
+  const bv = (k: string) => env[k] !== "false";  // enabled by default; user unchecks to disable
   const iv = (k: string) => (env[k] !== undefined && env[k] !== "" ? env[k] : cfg[k] ?? "");
   const sv = (k: string) => (env[k] !== undefined ? env[k] : (cfg[k] ?? ""));
   const secrets = ["PG_VT_API_KEY", "PG_GSB_API_KEY", "PG_SANDBOX_API_KEY", "PG_SANDBOX_URL", "PG_IMAP_PASSWORD", "PG_WEB_PASSWORD", "PG_WEB_SECRET_KEY"];
@@ -110,7 +110,18 @@ export default function SettingsPage() {
     setBusy(false);
   };
 
+  const PROVIDER_LABEL: Record<string, string> = { vt: "VirusTotal", gsb: "Google Safe Browsing", clamav: "ClamAV", sandbox: "Sandbox" };
+  const providerEnable = (p: string) =>
+    p === "vt" ? "PG_VT_ENABLED" : p === "gsb" ? "PG_GSB_ENABLED" : p === "clamav" ? "PG_CLAMAV_ENABLED" : "PG_SANDBOX_ENABLED";
+
   const StatusBadge = ({ provider }: { provider: string }) => {
+    const noKey = provider === "vt" ? !env.PG_VT_API_KEY
+      : provider === "gsb" ? !env.PG_GSB_API_KEY
+      : provider === "clamav" ? !env.PG_CLAMAV_HOST
+      : provider === "sandbox" ? (!env.PG_SANDBOX_API_KEY || !env.PG_SANDBOX_URL)
+      : false;
+    if (noKey && bv(providerEnable(provider)))
+      return <span className="env-status warn">⚠ Action required: add your {PROVIDER_LABEL[provider]} key</span>;
     const s = status[provider];
     if (!s || s.state === "idle") return null;
     if (s.state === "testing") return <span className="env-status testing">testing…</span>;
