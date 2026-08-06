@@ -8,6 +8,8 @@ __pycache__/
 !.env.example
 reports/
 emls/
+processed_ids.txt
+.venv/
 .cache/
 *.db
 *.db-journal
