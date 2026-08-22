@@ -1,10 +1,6 @@
 # PhishGuard
 
 <p align="center">
-  <img src="docs/assets/dashboard.png" alt="PhishGuard dashboard" width="880" />
-</p>
-
-<p align="center">
   <img src="docs/assets/dashboard-chart.svg" alt="PhishGuard analytics chart" width="880" />
 </p>
 
@@ -94,12 +90,11 @@ It ships in two forms that share the same engine:
 ### Detection Engine Coverage
 
 ```mermaid
-xybar-chart
+xychart-beta
     title "Analyzer Detection Coverage"
     x-axis ["Header Auth" , "Domain Rep", "URL Scanner", "Content", "Attachment", "Behavioral", "Org Context", "Sandbox"]
     y-axis "Max Score" 0 --> 30
     bar [20, 18, 20, 15, 12, 18, 10, 8]
-    bar [12, 0, 0, 0, 0, 12, 0, 0]
 ```
 
 ### Verdict Distribution
