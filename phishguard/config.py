@@ -89,6 +89,15 @@ class Config:
     abuseipdb_api_key: str = ""
     abuseipdb_enabled: bool = False
 
+    ai_local_url: str = "http://localhost:11434"
+    ai_local_model: str = "llama3.2"
+    ai_gemini_key: str = ""
+    ai_gemini_model: str = "gemini-2.0-flash"
+    ai_claude_key: str = ""
+    ai_claude_model: str = "claude-sonnet-4-20250514"
+    ai_kilo_key: str = ""
+    ai_kilo_model: str = "kilo"
+
     url_deep_scan_enabled: bool = True
     url_deep_screenshot_enabled: bool = False
     url_deep_max_redirects: int = 5
@@ -180,6 +189,14 @@ class Config:
             misp_verify_ssl=flag("PG_MISP_VERIFY_SSL", True),
             abuseipdb_api_key=env.get("PG_ABUSEIPDB_API_KEY", ""),
             abuseipdb_enabled=flag("PG_ABUSEIPDB_ENABLED", False) and bool(env.get("PG_ABUSEIPDB_API_KEY")),
+            ai_local_url=env.get("PG_AI_LOCAL_URL", "http://localhost:11434"),
+            ai_local_model=env.get("PG_AI_LOCAL_MODEL", "llama3.2"),
+            ai_gemini_key=env.get("PG_AI_GEMINI_KEY", ""),
+            ai_gemini_model=env.get("PG_AI_GEMINI_MODEL", "gemini-2.0-flash"),
+            ai_claude_key=env.get("PG_AI_CLAUDE_KEY", ""),
+            ai_claude_model=env.get("PG_AI_CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+            ai_kilo_key=env.get("PG_AI_KILO_KEY", ""),
+            ai_kilo_model=env.get("PG_AI_KILO_MODEL", "kilo"),
             url_deep_scan_enabled=flag("PG_URL_DEEP_SCAN_ENABLED", True),
             url_deep_screenshot_enabled=flag("PG_URL_DEEP_SCREENSHOT_ENABLED", False),
             url_deep_max_redirects=integer("PG_URL_DEEP_MAX_REDIRECTS", 5),

@@ -55,13 +55,41 @@ function ReportInner() {
 
   const [senderRep, setSenderRep] = useState<string | null>(null);
   const [trustMsg, setTrustMsg] = useState("");
+  const [aiProviders, setAiProviders] = useState<any>({});
+  const [aiProvider, setAiProvider] = useState("auto");
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   useEffect(() => {
     if (!r) return;
     api.get(`/sender/reputation?sender=${encodeURIComponent(r.sender.from)}`).then((d: any) => {
       setSenderRep(d.reputation);
     }).catch(() => {});
+    api.get(`/ai/providers`).then((d: any) => {
+      setAiProviders(d.providers || {});
+      if (d.auto) setAiProvider("auto");
+    }).catch(() => {});
   }, [r]);
+
+  const runAi = async () => {
+    if (!r) return;
+    setAiLoading(true); setAiError(""); setAiResponse("");
+    try {
+      const res = await api.get(`/ai/analyze/${id}?question=${encodeURIComponent(aiQuestion)}&provider=${aiProvider}`);
+      if (res.ok) {
+        setAiResponse(res.response || "(no response)");
+        if (res.error) setAiError(res.error);
+      } else {
+        setAiError(res.detail || "AI analysis failed");
+      }
+    } catch (e: any) {
+      setAiError(e.message || "AI analysis failed");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const setSender = async (action: "trust" | "mark-bad") => {
     setTrustMsg("");
@@ -104,6 +132,31 @@ function ReportInner() {
               </div>
             </div>
           )}
+          <div className="card">
+            <div className="card-h"><h3>AI analysis</h3></div>
+            <div className="card-b">
+              <div className="ai-controls">
+                <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value)} className="ai-select">
+                  <option value="auto">Auto (local first)</option>
+                  <option value="local">Local (Ollama)</option>
+                  {aiProviders.gemini && <option value="gemini">Gemini</option>}
+                  {aiProviders.claude && <option value="claude">Claude</option>}
+                  {aiProviders.kilo && <option value="kilo">kilo.ai</option>}
+                </select>
+                <input value={aiQuestion} onChange={(e) => setAiQuestion(e.target.value)}
+                  placeholder="Ask about this email (optional)…" className="ai-input" />
+                <button className="btn btn-primary btn-sm" onClick={runAi} disabled={aiLoading}>
+                  {aiLoading ? <Spinner /> : "Analyze with AI"}
+                </button>
+              </div>
+              {(aiResponse || aiError) && (
+                <div className="ai-response">
+                  {aiError && <div className="alert err" style={{ marginBottom: 8, padding: "8px 11px", fontSize: 12 }}>{aiError}</div>}
+                  {aiResponse && <div className="ai-text">{aiResponse}</div>}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="card">
             <div className="card-h"><h3>Email viewer</h3></div>
             <div className="card-b">

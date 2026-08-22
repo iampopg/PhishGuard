@@ -97,6 +97,9 @@ STRING_KEYS = {
     "PG_LOG_LEVEL",
     "PG_URLSCAN_API_KEY", "PG_SHODAN_API_KEY", "PG_OTX_API_KEY",
     "PG_MISP_URL", "PG_MISP_API_KEY", "PG_ABUSEIPDB_API_KEY",
+    "PG_AI_LOCAL_URL", "PG_AI_LOCAL_MODEL", "PG_AI_GEMINI_KEY",
+    "PG_AI_GEMINI_MODEL", "PG_AI_CLAUDE_KEY", "PG_AI_CLAUDE_MODEL",
+    "PG_AI_KILO_KEY", "PG_AI_KILO_MODEL",
 }
 
 
@@ -486,6 +489,39 @@ def create_api() -> FastAPI:
         ExportManager(cfg).export(report)
         RemediationManager(cfg).apply(report)
         return {"ok": True, "verdict": report.verdict.value, "risk_score": report.risk_score}
+
+    @app.get("/api/ai/analyze/{report_id}")
+    def ai_analyze(report_id: str, question: str = "", provider: str = "auto"):
+        ctx = _runtime_ctx()
+        if ctx.ai is None:
+            raise HTTPException(status_code=404, detail="AI not configured")
+        cfg = current_config()
+        if report_id == "all" or report_id == "":
+            store = _store(cfg)
+            reports = store.list_reports(limit=50)
+            summaries = []
+            for r in reports[:20]:
+                summaries.append({
+                    "report_id": r.get("report_id"), "verdict": r.get("verdict"),
+                    "risk_score": r.get("risk_score"), "subject": (r.get("source") or {}).get("subject"),
+                    "from": (r.get("sender") or {}).get("from"),
+                })
+            report = {"report_id": "all", "verdict": "mixed", "risk_score": 0,
+                      "source": {"subject": f"Analysis of {len(reports)} reports"}, "sender": {},
+                      "analyzers": [], "urls": [], "summaries": summaries}
+        else:
+            report = _store(cfg).get_report(report_id)
+            if not report:
+                raise HTTPException(status_code=404, detail="Not found")
+        result = ctx.ai.analyze(report, question=question, provider=provider)
+        return {"ok": True, **result, "providers": list(ctx.ai.providers.keys())}
+
+    @app.get("/api/ai/providers")
+    def ai_providers():
+        ctx = _runtime_ctx()
+        if ctx.ai is None:
+            return {"providers": [], "auto": None}
+        return {"providers": ctx.ai.providers, "auto": ctx.ai._auto_provider()}
 
     # ---------- rules ----------
     @app.get("/api/rules")

@@ -48,6 +48,8 @@ def _load_ctx(args) -> AnalysisContext:
        getattr(config, "abuseipdb_enabled", False):
         ctx.ti = ThreatIntelligenceManager(config)
     ctx.reputation = SenderReputationStore(str(Path(args.cache_dir) / "reputation.db"))
+    from phishguard.ai import PhishGuardAI
+    ctx.ai = PhishGuardAI(config)
     return ctx
 
 

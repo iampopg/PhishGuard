@@ -52,8 +52,10 @@ def _runtime_ctx() -> AnalysisContext:
     ti = ThreatIntelligenceManager(cfg) if cfg.urlscan_enabled or cfg.shodan_enabled or \
         cfg.otx_enabled or cfg.misp_enabled or cfg.abuseipdb_enabled else None
     reputation = SenderReputationStore(str(Path(cfg.report_dir) / "reputation.db"))
+    from phishguard.ai import PhishGuardAI
+    ai = PhishGuardAI(cfg)
     return AnalysisContext(config=cfg, org_profile=org, intel=intel, behavioral=behavioral,
-                           ti=ti, evidence=evidence, reputation=reputation, mailbox_id="web")
+                           ti=ti, evidence=evidence, reputation=reputation, ai=ai, mailbox_id="web")
 
 
 def _store(cfg: Config) -> ReportStore:

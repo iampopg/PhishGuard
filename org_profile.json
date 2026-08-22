@@ -1,0 +1,11 @@
+{
+  "protected_domains": [
+    "example.com"
+  ],
+  "vip_names": [
+    "CEO"
+  ],
+  "brand_keywords": [],
+  "brand_domains": [],
+  "trusted_domains": []
+}

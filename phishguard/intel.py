@@ -8,6 +8,34 @@ from typing import Dict, Optional
 CACHE_VERSION = 1
 
 
+def _vt_verdict(data: dict) -> dict:
+    """Parse a VirusTotal API response into a normalized verdict.
+
+    VT returns HTTP 200 for every scanned URL/hash, clean or not. A URL is only
+    malicious when its community scanners actually flag it, so we read the
+    analysis stats and require at least one malicious detection.
+    """
+    attrs = (data or {}).get("data", {}).get("attributes", {}) if isinstance(data, dict) else {}
+    stats = attrs.get("last_analysis_stats", {}) or {}
+    malicious = int(stats.get("malicious", 0) or 0)
+    suspicious = int(stats.get("suspicious", 0) or 0)
+    total = sum(int(v or 0) for v in stats.values()) if stats else 0
+    engines = []
+    results = attrs.get("last_analysis_results", {}) or {}
+    for engine, r in results.items():
+        if isinstance(r, dict) and r.get("category") in ("malicious", "suspicious"):
+            engines.append({"engine": engine, "category": r.get("category"), "result": r.get("result")})
+    return {
+        "malicious": malicious > 0,
+        "source": "virustotal",
+        "malicious_count": malicious,
+        "suspicious_count": suspicious,
+        "total_engines": total,
+        "engines": engines[:15],
+        "permalink": attrs.get("permalink"),
+    }
+
+
 class IntelligenceHub:
     """Threat-intel lookups with graceful offline fallback.
 
@@ -77,11 +105,11 @@ class IntelligenceHub:
                 headers={"x-apikey": key},
                 data={"url": url}, timeout=10,
             )
-            if r.status_code == 200:
-                return {"malicious": True, "source": "virustotal", "detail": r.json()}
+            if r.status_code != 200:
+                return None
+            return _vt_verdict(r.json())
         except Exception:
             return None
-        return None
 
     def _vt_hash(self, sha256: str) -> Optional[dict]:
         try:
@@ -96,8 +124,8 @@ class IntelligenceHub:
                 f"https://www.virustotal.com/api/v3/files/{sha256}",
                 headers={"x-apikey": key}, timeout=10,
             )
-            if r.status_code == 200:
-                return {"malicious": True, "source": "virustotal", "detail": r.json()}
+            if r.status_code != 200:
+                return None
+            return _vt_verdict(r.json())
         except Exception:
             return None
-        return None

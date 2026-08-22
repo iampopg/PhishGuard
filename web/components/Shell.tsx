@@ -9,6 +9,7 @@ const NAV: { href: string; label: string; icon: string; group?: string }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dash", group: "Analyze" },
   { href: "/reports", label: "Reports", icon: "reports" },
   { href: "/scan", label: "Scan", icon: "scan" },
+  { href: "/ai", label: "AI Assistant", icon: "ai", group: "Analyze" },
   { href: "/mailbox", label: "Mailbox", icon: "mailbox", group: "Operations" },
   { href: "/feeds", label: "Threat Feeds", icon: "feeds" },
   { href: "/remediation", label: "Remediation", icon: "remediation" },

@@ -27,7 +27,8 @@ class ReportStore:
                 verdict TEXT,
                 risk_score INTEGER,
                 message_id TEXT,
-                data TEXT
+                data TEXT,
+                raw BLOB
             );
             CREATE TABLE IF NOT EXISTS feedback (
                 report_id TEXT,
@@ -42,17 +43,41 @@ class ReportStore:
             CREATE INDEX IF NOT EXISTS idx_reports_ts ON reports(timestamp);
             """
         )
+        # Migration: add raw column if missing from a previous schema version.
+        cols = [r[1] for r in self._conn.execute("PRAGMA table_info(reports)").fetchall()]
+        if "raw" not in cols:
+            try:
+                self._conn.execute("ALTER TABLE reports ADD COLUMN raw BLOB")
+            except Exception:
+                pass
         self._conn.commit()
 
-    def save_report(self, report: Report) -> None:
+    def save_report(self, report: Report, raw: bytes = None) -> None:
         self._conn.execute(
             "INSERT OR REPLACE INTO reports "
-            "(report_id, timestamp, verdict, risk_score, message_id, data) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(report_id, timestamp, verdict, risk_score, message_id, data, raw) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (report.report_id, report.timestamp, report.verdict.value,
              report.risk_score, report.source.get("message_id"),
-             json.dumps(report.to_dict(), default=str)),
+             json.dumps(report.to_dict(), default=str), raw),
         )
+        self._conn.commit()
+
+    def get_raw(self, report_id: str) -> Optional[bytes]:
+        row = self._conn.execute(
+            "SELECT raw FROM reports WHERE report_id = ?", (report_id,)).fetchone()
+        return row["raw"] if row and row["raw"] else None
+
+    def list_report_ids(self, limit: int = 10000) -> List[str]:
+        rows = self._conn.execute(
+            "SELECT report_id FROM reports ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
+        return [r["report_id"] for r in rows]
+
+    def update_report(self, report: Report) -> None:
+        self._conn.execute(
+            "UPDATE reports SET timestamp = ?, verdict = ?, risk_score = ?, data = ? WHERE report_id = ?",
+            (report.timestamp, report.verdict.value, report.risk_score,
+             json.dumps(report.to_dict(), default=str), report.report_id))
         self._conn.commit()
 
     def get_report(self, report_id: str) -> Optional[Dict[str, Any]]:

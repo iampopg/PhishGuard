@@ -12,6 +12,7 @@ const P: Record<string, JSX.Element> = {
   logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>,
   forensics: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></>,
   ti: <><path d="M2 12h20" /><path d="M12 2v20" /><circle cx="12" cy="12" r="4" /></>,
+  ai: <><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" /><circle cx="9.5" cy="14.5" r="1" /><circle cx="14.5" cy="14.5" r="1" /></>,
 };
 
 export function Icon({ name, className = "ico", style }: { name: keyof typeof P | string; className?: string; style?: React.CSSProperties }) {

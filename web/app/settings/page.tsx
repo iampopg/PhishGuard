@@ -29,11 +29,33 @@ export default function SettingsPage() {
   const [monitorOn, setMonitorOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState("");
+  const [tab, setTab] = useState("detection");
+  const [aiProviders, setAiProviders] = useState<any[]>([]);
   const [status, setStatus] = useState<Record<string, { state: "idle" | "testing" | "ok" | "err"; msg?: string }>>({});
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => { api.get("/settings").then((d: any) => { setCfg(d.config || {}); setEnv(d.env || {}); }).catch(() => {}); }, []);
   useEffect(() => { api.get("/mailbox").then((d: any) => setMonitorOn(!!d.monitor)).catch(() => {}); }, []);
+  useEffect(() => {
+    api.get("/ai/providers").then((d: any) => {
+      const providers = d.providers || {};
+      const auto = d.auto;
+      const list: any[] = [];
+      const order = ["local", "gemini", "claude", "kilo"];
+      for (const name of order) {
+        const p = providers[name];
+        if (!p) continue;
+        list.push({
+          name,
+          model: p.model,
+          available: p.available || (p.key && p.key.length > 0),
+          auto: auto === name,
+          local_models: p.local_models,
+        });
+      }
+      setAiProviders(list);
+    }).catch(() => {});
+  }, [env]);
 
   // Auto-test enrichment providers that have credentials but aren't enabled yet,
   // so a working key turns the feature on automatically.
@@ -129,34 +151,98 @@ export default function SettingsPage() {
     return <span className="env-status err">✗ {s.msg}</span>;
   };
 
+  const TABS = [
+    { id: "detection", label: "Detection" },
+    { id: "enrichment", label: "Enrichment" },
+    { id: "ai", label: "AI" },
+    { id: "thresholds", label: "Thresholds" },
+  ];
+
   return (
     <Shell title="Settings" sub="Engine behaviour, enrichment & server (changes auto-save)">
+      <div className="settings-tabs">
+        {TABS.map((t) => (
+          <button key={t.id} className={`settings-tab ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
       <form ref={formRef} onSubmit={(e) => { e.preventDefault(); saveAll(); }}>
-        <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
-          <div className="card"><div className="card-h"><h3>Detection engine</h3></div><div className="card-b">
-            <Toggle name="PG_DNS_CHECKS_ENABLED" label="DNS / reputation checks" checked={bv("PG_DNS_CHECKS_ENABLED")} onChange={() => saveAll()} />
-            <Toggle name="PG_BEHAVIORAL_ENABLED" label="Behavioral BEC baseline" checked={bv("PG_BEHAVIORAL_ENABLED")} onChange={() => saveAll()} />
-            <Toggle name="PG_SANDBOX_ENABLED" label="Sandbox execution" checked={bv("PG_SANDBOX_ENABLED")} onChange={() => saveAll()} />
-            <Toggle name="PG_CLAMAV_ENABLED" label="ClamAV attachment scan" checked={bv("PG_CLAMAV_ENABLED")} onChange={() => saveAll()} />
-            <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "14px 0" }} />
-            <Toggle name="PG_VT_ENABLED" label="VirusTotal enrichment" checked={bv("PG_VT_ENABLED")} onChange={() => saveAll()} />
-            <Toggle name="PG_GSB_ENABLED" label="Google Safe Browsing" checked={bv("PG_GSB_ENABLED")} onChange={() => saveAll()} />
-          </div></div>
-          <div className="card"><div className="card-h"><h3>Mailbox & response</h3></div><div className="card-b">
-            <Toggle name="PG_IMAP_USE_SSL" label="IMAP SSL/TLS" checked={bv("PG_IMAP_USE_SSL")} onChange={() => saveAll()} />
-            <Toggle name="PG_IMAP_UNSEEN_ONLY" label="Unseen only" checked={bv("PG_IMAP_UNSEEN_ONLY")} onChange={() => saveAll()} />
-            <Toggle name="PG_IMAP_MARK_READ" label="Mark read after scan" checked={bv("PG_IMAP_MARK_READ")} onChange={() => saveAll()} />
-            <div className="monitor-toggle">
-              <span>Continuous monitoring</span>
-              <button type="button" className={`toggle-btn ${monitorOn ? "on" : ""}`} onClick={toggleMonitor} disabled={busy}>
-                <span className="knob" />{monitorOn ? "ON" : "OFF"}
-              </button>
+        {tab === "detection" && (
+          <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
+            <div className="card"><div className="card-h"><h3>Detection engine</h3></div><div className="card-b">
+              <Toggle name="PG_DNS_CHECKS_ENABLED" label="DNS / reputation checks" checked={bv("PG_DNS_CHECKS_ENABLED")} onChange={() => saveAll()} />
+              <Toggle name="PG_BEHAVIORAL_ENABLED" label="Behavioral BEC baseline" checked={bv("PG_BEHAVIORAL_ENABLED")} onChange={() => saveAll()} />
+              <Toggle name="PG_SANDBOX_ENABLED" label="Sandbox execution" checked={bv("PG_SANDBOX_ENABLED")} onChange={() => saveAll()} />
+              <Toggle name="PG_CLAMAV_ENABLED" label="ClamAV attachment scan" checked={bv("PG_CLAMAV_ENABLED")} onChange={() => saveAll()} />
+              <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "14px 0" }} />
+              <Toggle name="PG_VT_ENABLED" label="VirusTotal enrichment" checked={bv("PG_VT_ENABLED")} onChange={() => saveAll()} />
+              <Toggle name="PG_GSB_ENABLED" label="Google Safe Browsing" checked={bv("PG_GSB_ENABLED")} onChange={() => saveAll()} />
+            </div></div>
+            <div className="card"><div className="card-h"><h3>Mailbox & response</h3></div><div className="card-b">
+              <Toggle name="PG_IMAP_USE_SSL" label="IMAP SSL/TLS" checked={bv("PG_IMAP_USE_SSL")} onChange={() => saveAll()} />
+              <Toggle name="PG_IMAP_UNSEEN_ONLY" label="Unseen only" checked={bv("PG_IMAP_UNSEEN_ONLY")} onChange={() => saveAll()} />
+              <Toggle name="PG_IMAP_MARK_READ" label="Mark read after scan" checked={bv("PG_IMAP_MARK_READ")} onChange={() => saveAll()} />
+              <div className="monitor-toggle">
+                <span>Continuous monitoring</span>
+                <button type="button" className={`toggle-btn ${monitorOn ? "on" : ""}`} onClick={toggleMonitor} disabled={busy}>
+                  <span className="knob" />{monitorOn ? "ON" : "OFF"}
+                </button>
+              </div>
+              <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "14px 0" }} />
+              <Toggle name="PG_REMEDIATION_ENABLED" label="Remediation enabled" checked={bv("PG_REMEDIATION_ENABLED")} onChange={() => saveAll()} />
+              <Toggle name="PG_EXPORT_ENABLED" label="Export enabled" checked={bv("PG_EXPORT_ENABLED")} onChange={() => saveAll()} />
+              <Toggle name="PG_EXPORT_CEF" label="Export as CEF" checked={bv("PG_EXPORT_CEF")} onChange={() => saveAll()} />
+            </div></div>
+          </div>
+        )}
+
+        {tab === "enrichment" && (
+          <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
+            <div className="card"><div className="card-h"><h3>Threat intelligence</h3></div><div className="card-b">
+              <div className="field"><label>Trusted domains</label><input name="PG_TRUSTED_DOMAINS" defaultValue={sv("PG_TRUSTED_DOMAINS")} onBlur={saveAll} /></div>
+              <div className="field"><label>Org profile path</label><input name="PG_ORG_PROFILE_PATH" defaultValue={sv("PG_ORG_PROFILE_PATH")} onBlur={saveAll} /></div>
+              <div className="field"><label>Report directory</label><input name="PG_REPORT_DIR" defaultValue={sv("PG_REPORT_DIR")} onBlur={saveAll} /></div>
+              <div className="field"><label>ClamAV host</label>
+                <input name="PG_CLAMAV_HOST" defaultValue={sv("PG_CLAMAV_HOST")} onBlur={() => onEnrichBlur("PG_CLAMAV_HOST")} />
+                <StatusBadge provider="clamav" /></div>
+              <div className="field"><label>Sandbox provider</label><input name="PG_SANDBOX_PROVIDER" defaultValue={sv("PG_SANDBOX_PROVIDER")} onBlur={saveAll} /></div>
+            </div></div>
+            <div className="card"><div className="card-h"><h3>API keys</h3></div><div className="card-b">
+              {secrets.map((k) => (
+                <div className="field" key={k}>
+                  <label>{k.replace("PG_", "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}</label>
+                  <input type="password" name={k} defaultValue={env[k] || ""} placeholder="••••••••"
+                    onBlur={() => onEnrichBlur(k)} />
+                  {ENRICH[k] && <StatusBadge provider={ENRICH[k].provider} />}
+                </div>
+              ))}
+            </div></div>
+          </div>
+        )}
+
+        {tab === "ai" && (
+          <div className="card"><div className="card-h"><h3>AI analysis</h3></div><div className="card-b">
+            <div className="ai-providers">
+              {aiProviders.map((p: any) => (
+                <div key={p.name} className={`ai-provider ${p.available ? "available" : ""} ${p.auto ? "auto" : ""}`}>
+                  <span className={`dot ${p.available ? "" : "warn"}`}></span>
+                  <span className="ai-provider-name">{p.name}</span>
+                  <span className="ai-provider-model">{p.model}</span>
+                  {p.name === "local" && p.local_models && <span className="ai-provider-models">{p.local_models.join(", ")}</span>}
+                  {p.auto && <span className="ai-provider-auto">auto</span>}
+                  {!p.available && <span className="ai-provider-note">{p.name === "local" ? "not detected" : "no key"}</span>}
+                </div>
+              ))}
             </div>
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "14px 0" }} />
-            <Toggle name="PG_REMEDIATION_ENABLED" label="Remediation enabled" checked={bv("PG_REMEDIATION_ENABLED")} onChange={() => saveAll()} />
-            <Toggle name="PG_EXPORT_ENABLED" label="Export enabled" checked={bv("PG_EXPORT_ENABLED")} onChange={() => saveAll()} />
-            <Toggle name="PG_EXPORT_CEF" label="Export as CEF" checked={bv("PG_EXPORT_CEF")} onChange={() => saveAll()} />
+            <div className="field"><label>Local AI URL (Ollama)</label><input name="PG_AI_LOCAL_URL" defaultValue={sv("PG_AI_LOCAL_URL")} onBlur={saveAll} /></div>
+            <div className="field"><label>Local model</label><input name="PG_AI_LOCAL_MODEL" defaultValue={sv("PG_AI_LOCAL_MODEL")} onBlur={saveAll} /></div>
+            <div className="field"><label>Gemini API key</label><input type="password" name="PG_AI_GEMINI_KEY" defaultValue={env.PG_AI_GEMINI_KEY || ""} placeholder="••••••••" onBlur={saveAll} /></div>
+            <div className="field"><label>Claude API key</label><input type="password" name="PG_AI_CLAUDE_KEY" defaultValue={env.PG_AI_CLAUDE_KEY || ""} placeholder="••••••••" onBlur={saveAll} /></div>
+            <div className="field"><label>kilo.ai API key</label><input type="password" name="PG_AI_KILO_KEY" defaultValue={env.PG_AI_KILO_KEY || ""} placeholder="••••••••" onBlur={saveAll} /></div>
           </div></div>
+        )}
+
+        {tab === "thresholds" && (
           <div className="card"><div className="card-h"><h3>Thresholds & intervals</h3></div><div className="card-b">
             <div className="row row-3">
               <div className="field"><label>Suspicious ≥</label><input name="PG_THRESHOLD_SUSPICIOUS" defaultValue={iv("PG_THRESHOLD_SUSPICIOUS")} onBlur={saveAll} /></div>
@@ -173,24 +259,7 @@ export default function SettingsPage() {
               <div className="field"><label>Web port</label><input name="PG_WEB_PORT" defaultValue={iv("PG_WEB_PORT")} onBlur={saveAll} /></div>
             </div>
           </div></div>
-          <div className="card"><div className="card-h"><h3>Enrichment keys & paths</h3></div><div className="card-b">
-            <div className="field"><label>Trusted domains</label><input name="PG_TRUSTED_DOMAINS" defaultValue={sv("PG_TRUSTED_DOMAINS")} onBlur={saveAll} /></div>
-            <div className="field"><label>Org profile path</label><input name="PG_ORG_PROFILE_PATH" defaultValue={sv("PG_ORG_PROFILE_PATH")} onBlur={saveAll} /></div>
-            <div className="field"><label>Report directory</label><input name="PG_REPORT_DIR" defaultValue={sv("PG_REPORT_DIR")} onBlur={saveAll} /></div>
-            <div className="field"><label>ClamAV host</label>
-              <input name="PG_CLAMAV_HOST" defaultValue={sv("PG_CLAMAV_HOST")} onBlur={() => onEnrichBlur("PG_CLAMAV_HOST")} />
-              <StatusBadge provider="clamav" /></div>
-            <div className="field"><label>Sandbox provider</label><input name="PG_SANDBOX_PROVIDER" defaultValue={sv("PG_SANDBOX_PROVIDER")} onBlur={saveAll} /></div>
-            {secrets.map((k) => (
-              <div className="field" key={k}>
-                <label>{k.replace("PG_", "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}</label>
-                <input type="password" name={k} defaultValue={env[k] || ""} placeholder="••••••••"
-                  onBlur={() => onEnrichBlur(k)} />
-                {ENRICH[k] && <StatusBadge provider={ENRICH[k].provider} />}
-              </div>
-            ))}
-          </div></div>
-        </div>
+        )}
       </form>
       <div style={{ marginTop: 12 }}>{busy && <span className="env-status testing">saving…</span>}{flash && <AlertBox kind="ok">{flash}</AlertBox>}</div>
     </Shell>

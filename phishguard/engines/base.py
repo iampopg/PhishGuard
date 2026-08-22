@@ -15,6 +15,7 @@ class AnalysisContext:
     ti: Any = None
     evidence: Any = None
     reputation: Any = None
+    ai: Any = None
     mailbox_id: str = "default"
     extra: Dict[str, Any] = field(default_factory=dict)
 
