@@ -38,6 +38,9 @@
 - [Configuration](#configuration)
 - [Usage — CLI](#usage--cli)
 - [Usage — Web dashboard](#usage--web-dashboard)
+- [AI Assistant](#ai-assistant)
+- [Sender reputation &amp; trust](#sender-reputation--trust)
+- [Forensic observables &amp; PDF reporting](#forensic-observables--pdf-reporting)
 - [Analyzers](#analyzers)
 - [Scoring & thresholds](#scoring--thresholds)
 - [REST API](#rest-api)
@@ -325,6 +328,63 @@ the URL and log in.
 
 ---
 
+## AI Assistant
+
+PhishGuard includes a multi-provider AI assistant that can analyze emails, explain verdicts,
+and investigate your logs autonomously.
+
+**Providers:** Local (Ollama), Google Gemini, Anthropic Claude, kilo.ai, or **auto** (picks the
+best available). When Ollama is running locally it is detected automatically; otherwise set an
+API key in Settings → AI.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/ai/providers` | List providers, availability, and local models |
+| `GET /api/ai/analyze/{id}?provider=auto&question=…` | Analyze a report (or `all`) and get a verdict explanation |
+
+The **AI** page (`/ai`) provides a full chat interface with conversation history, model
+selection, and a report picker — type *"investigate all phishing logs"* to let the AI summarize
+your detections.
+
+Configuration (`.env`):
+```
+PG_AI_LOCAL_URL=http://localhost:11434   # Ollama endpoint (auto-detected)
+PG_AI_GEMINI_KEY=...
+PG_AI_CLAUDE_KEY=...
+PG_AI_KILO_KEY=...
+```
+
+---
+
+## Sender reputation & trust
+
+A SQLite-backed `SenderReputationStore` lets you mark senders as **trusted** or **malicious**.
+Trusted senders that also pass SPF+DKIM+DMARC receive a negative trust bonus that offsets
+false-positive contributions — this is the primary defense against bulk-mail false positives.
+
+- One-click **"Trust sender"** / **"Mark malicious"** on each report
+- Persists across restarts; survives reboots
+- Keyed by registrable domain (whitelisting `taxact.com` covers all its addresses)
+
+---
+
+## Forensic observables & PDF reporting
+
+Every analysis can extract **indicators of compromise** — URLs, domains, IPs, email addresses,
+file hashes, and crypto wallet addresses — and enrich them across threat-intel providers.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/forensics/ioc/{report_id}` | Extract IOCs from a report |
+| `POST /api/forensics/enrich` | Enrich IOCs across enabled providers |
+| `GET /api/forensics/evidence/{report_id}` | List preserved artifacts (raw eml, headers, body, screenshot) |
+| `GET /api/reports/export-pdf?verdict=phishing&from=2026-01-01` | Download a branded, filtered PDF report |
+
+The PDF report is generated with `reportlab`, includes verdict statistics and a color-coded
+table, and is signed with `@iampopg` and the GitHub repository link.
+
+---
+
 ## Analyzers
 
 PhishGuard runs nine independent analyzers. Each emits findings with a `severity` and a
@@ -341,6 +401,10 @@ contribution to `risk_score`; the aggregator caps and sums them.
 | `attachment_analyzer` | Executables, macro Office docs, double extensions, HTML, hash reputation (ClamAV / VT) |
 | `behavioral` | First-contact BEC anomalies vs. a local baseline of sender behavior |
 | `sandbox` | Optional ClamAV INSTREAM scan / hash reputation |
+| `trust` | Sender reputation — negative bonus for trusted senders, boost for known-bad |
+| `url_deep_scanner` | Follows redirects, resolves shorteners, detects credential-form landing pages |
+| `calendar` | Suspicious `.ics` invites, urgent calendar language, lookalike calendar links |
+| `qr_scanner` | QR codes in attachments — extracts embedded URLs for analysis |
 
 ---
 
