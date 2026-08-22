@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <img src="docs/assets/dashboard-chart.svg" alt="PhishGuard analytics chart" width="880" />
+</p>
+
+<p align="center">
   <a href="https://github.com/iampopg/PhishGuard/stargazers"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+" />
   <img src="https://img.shields.io/badge/web-Next.js%2014%20%2B%20FastAPI-8a2be2.svg" alt="Next.js + FastAPI" />
@@ -86,6 +90,40 @@ It ships in two forms that share the same engine:
 ---
 
 ## Feature tour
+
+### Detection Engine Coverage
+
+```mermaid
+xybar-chart
+    title "Analyzer Detection Coverage"
+    x-axis ["Header Auth" , "Domain Rep", "URL Scanner", "Content", "Attachment", "Behavioral", "Org Context", "Sandbox"]
+    y-axis "Max Score" 0 --> 30
+    bar [20, 18, 20, 15, 12, 18, 10, 8]
+    bar [12, 0, 0, 0, 0, 12, 0, 0]
+```
+
+### Verdict Distribution
+
+```mermaid
+pie showData
+    title Detection Verdict Breakdown
+    "Safe" : 45
+    "Suspicious" : 28
+    "Phishing" : 18
+    "Malicious" : 9
+```
+
+### Weekly Threat Volume
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1e40af", "primaryTextColor": "#fff", "primaryBorderColor": "#1e3a8a", "lineColor": "#6b7280", "secondaryColor": "#f59e0b", "tertiaryColor": "#10b981"}} }%%
+xychart-beta
+    title "Weekly Analysis Volume"
+    x-axis ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    y-axis "Reports" 0 --> 1200
+    bar [850, 920, 1100, 980, 1050, 430, 380]
+    line [45, 28, 18, 9, 22, 12, 8]
+```
 
 - **Detection engine first.** Nine transparent analyzers covering headers, authentication,
   domains, org context, URLs, content, attachments, behavior, and sandboxing.
