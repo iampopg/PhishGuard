@@ -22,3 +22,17 @@ web/out/
 web/.next/
 web/package-lock.json
 
+
+# Intel cache + evidence (local data)
+.intel_cache/
+evidence/
+monitor.db-shm
+monitor.db-wal
+behavioral.db*
+phishguard.db*
+reputation.db*
+*.db-shm
+*.db-wal
+
+# Agent workspace
+.kilo/

@@ -25,22 +25,23 @@ export default function DashboardPage() {
       <div className="grid" style={{ gridTemplateColumns: "1.6fr 1fr", alignItems: "start" }}>
         <div className="card">
           <div className="card-h"><h3>Recent analyses</h3><a className="btn btn-ghost btn-sm" href="/reports">View all</a></div>
-          <div className="card-b" style={{ padding: 0 }}>
+          <div className="card-b">
             {d.recent.length ? (
-              <table className="table">
-                <thead><tr><th>Subject</th><th>Sender</th><th>Verdict</th><th>Score</th><th>Time</th></tr></thead>
-                <tbody>
-                  {d.recent.map((r: Report) => (
-                    <tr key={r.report_id}>
-                      <td><a className="subj" href={`/report?id=`}>{r.source.subject || "(no subject)"}</a><small className="mono">{r.report_id}</small></td>
-                      <td>{r.sender.display_name || r.sender.from}<br /><small className="muted">{r.sender.from}</small></td>
-                      <td><VerdictBadge v={r.verdict} /></td>
-                      <td><span className="score-pill">{r.risk_score}</span></td>
-                      <td className="muted small">{r.timestamp.replace("T", " ").slice(0, 19)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="recent-list">
+                {d.recent.map((r: Report) => (
+                  <a key={r.report_id} className="recent-item" href={`/report?id=${r.report_id}`}>
+                    <span className={`ri-badge ${r.verdict}`}></span>
+                    <div className="ri-main">
+                      <div className="ri-subj">{r.source.subject || "(no subject)"}</div>
+                      <div className="ri-meta">{r.sender.from} · {r.timestamp.replace("T", " ").slice(0, 19)}</div>
+                    </div>
+                    <div className="ri-right">
+                      <VerdictBadge v={r.verdict} />
+                      <span className="ri-score">{r.risk_score}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
             ) : <Empty>No analyses yet. Run a <a href="/scan">scan</a> or connect a <a href="/mailbox">mailbox</a>.</Empty>}
           </div>
         </div>

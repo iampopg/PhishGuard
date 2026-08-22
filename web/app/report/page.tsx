@@ -15,6 +15,8 @@ function ReportInner() {
   const [label, setLabel] = useState("");
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState("headers");
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [reMsg, setReMsg] = useState("");
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -34,11 +36,74 @@ function ReportInner() {
   const headers: Record<string, string> = r.raw_headers || {};
   const atts: any[] = r.attachments || [];
 
+  const reanalyze = async () => {
+    if (!confirm("Re-run the current detectors on this email? The verdict and score will update.")) return;
+    setReanalyzing(true);
+    try {
+      const res = await api.postForm(`/report/${id}/reanalyze`, {});
+      if (res.ok) {
+        setReMsg(`Updated: ${res.verdict} (score ${res.risk_score}) — reload to view.`);
+      } else {
+        setReMsg(res.detail || "Re-analyze failed (raw email may not be stored yet).");
+      }
+    } catch (e: any) {
+      setReMsg(e.message || "Re-analyze failed");
+    } finally {
+      setReanalyzing(false);
+    }
+  };
+
+  const [senderRep, setSenderRep] = useState<string | null>(null);
+  const [trustMsg, setTrustMsg] = useState("");
+
+  useEffect(() => {
+    if (!r) return;
+    api.get(`/sender/reputation?sender=${encodeURIComponent(r.sender.from)}`).then((d: any) => {
+      setSenderRep(d.reputation);
+    }).catch(() => {});
+  }, [r]);
+
+  const setSender = async (action: "trust" | "mark-bad") => {
+    setTrustMsg("");
+    const res = await api.postForm(`/sender/${action}`, { sender: r.sender.from });
+    if (res.ok) {
+      setSenderRep(res.reputation);
+      setTrustMsg(action === "trust" ? "Sender allow-listed — future scans will trust them." : "Sender marked malicious.");
+    } else {
+      setTrustMsg("Failed to update sender reputation.");
+    }
+  };
+
   return (
-    <Shell title={r.source.subject || "(no subject)"} sub={`Report ${r.report_id}`}>
+    <Shell title={r.source.subject || "(no subject)"} sub={`Report ${r.report_id}`}
+      actions={<div className="actions">
+        <a className="btn btn-ghost btn-sm" href="/reports">← Back to reports</a>
+        <button className="btn btn-ghost btn-sm" onClick={reanalyze} disabled={reanalyzing}>
+          {reanalyzing ? <Spinner /> : "⟳ Re-analyze"}
+        </button>
+        {senderRep !== "safe" && (
+          <button className="btn btn-sm" onClick={() => setSender("trust")}>✓ Trust sender</button>
+        )}
+        {senderRep !== "bad" && (
+          <button className="btn btn-sm btn-danger" onClick={() => setSender("mark-bad")}>⚠ Mark malicious</button>
+        )}
+       </div>}>
+      {reMsg && <div className="alert info" style={{ marginBottom: 14 }}>{reMsg}</div>}
+      {trustMsg && <div className="alert info" style={{ marginBottom: 14 }}>{trustMsg}</div>}
       <div className="grid" style={{ gridTemplateColumns: "1.7fr 1fr", alignItems: "start" }}>
         <div className="grid" style={{ gap: 18 }}>
           <ReportSummary r={r} full />
+          {senderRep && (
+            <div className="card">
+              <div className="card-h"><h3>Sender reputation</h3></div>
+              <div className="card-b">
+                <div className="kv">
+                  <dt>Sender</dt><dd className="mono">{r.sender.from}</dd>
+                  <dt>Status</dt><dd className={`sender-rep ${senderRep}`}>{senderRep === "safe" ? "Trusted (allow-listed)" : senderRep === "bad" ? "Marked malicious" : "Unknown"}</dd>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="card">
             <div className="card-h"><h3>Email viewer</h3></div>
             <div className="card-b">
