@@ -67,13 +67,21 @@ def analyze(email: ParsedEmail, ctx: AnalysisContext) -> AnalyzerResult:
             "No SPF/DKIM/DMARC results present in headers; cannot verify sender authenticity.",
             Severity.LOW, 5, {"domain": email.sender_domain}))
 
+    all_auth_pass = spf == "pass" and dkim == "pass" and dmarc == "pass"
+
     env_dom = email.envelope_from and registrable_domain(email.envelope_from)
     from_dom = registrable_domain(email.sender_domain)
     if env_dom and from_dom and normalize_domain(env_dom) != normalize_domain(from_dom):
-        findings.append(make_finding(
-            NAME, "Envelope/Header domain mismatch",
-            f"Envelope sender domain '{env_dom}' differs from From domain '{from_dom}'.",
-            Severity.MEDIUM, 15, {"envelope": env_dom, "from": from_dom}))
+        if all_auth_pass:
+            findings.append(make_finding(
+                NAME, "Envelope/Header domain mismatch (ESP)",
+                f"Envelope '{env_dom}' differs from From '{from_dom}'; legitimate when routed through an authorized sending service.",
+                Severity.INFO, 2, {"envelope": env_dom, "from": from_dom}))
+        else:
+            findings.append(make_finding(
+                NAME, "Envelope/Header domain mismatch",
+                f"Envelope sender domain '{env_dom}' differs from From domain '{from_dom}'.",
+                Severity.MEDIUM, 15, {"envelope": env_dom, "from": from_dom}))
 
     if getattr(ctx.config, "dns_checks_enabled", False):
         present = _dmarc_record_present(email.sender_domain)

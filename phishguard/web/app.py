@@ -13,6 +13,9 @@ from phishguard.config_store import (current_config, load_env_dict, reload_env,
 from phishguard.engines.base import AnalysisContext
 from phishguard.export import ExportManager
 from phishguard.feeds import FeedManager
+from phishguard.forensics.ioc import extract_iocs
+from phishguard.forensics.takedown import build_takedown_package
+from phishguard.forensics.evidence import EvidenceStore
 from phishguard.intel import IntelligenceHub
 from phishguard.mail.fetcher import MailFetcher
 from phishguard.mail.parser import parse_message
@@ -21,7 +24,9 @@ from phishguard.org_profile import OrgProfile
 from phishguard.pipeline import analyze_email
 from phishguard.remediation import RemediationManager
 from phishguard.report_store import ReportStore
+from phishguard.reputation import SenderReputationStore
 from phishguard.rules import DEFAULT_RULES
+from phishguard.ti import ThreatIntelligenceManager
 from phishguard.util.text import extract_urls
 
 BOOL_KEYS = {
@@ -43,7 +48,12 @@ def _runtime_ctx() -> AnalysisContext:
     org = OrgProfile.load(org_path) if os.path.exists(org_path) else OrgProfile()
     intel = IntelligenceHub(cfg, cache_dir=Path(cfg.report_dir) / ".intel_cache")
     behavioral = BehavioralStore(Path(cfg.report_dir) / "behavioral.db") if cfg.behavioral_enabled else None
-    return AnalysisContext(config=cfg, org_profile=org, intel=intel, behavioral=behavioral, mailbox_id="web")
+    evidence = EvidenceStore(Path(cfg.report_dir)) if cfg.evidence_enabled else None
+    ti = ThreatIntelligenceManager(cfg) if cfg.urlscan_enabled or cfg.shodan_enabled or \
+        cfg.otx_enabled or cfg.misp_enabled or cfg.abuseipdb_enabled else None
+    reputation = SenderReputationStore(str(Path(cfg.report_dir) / "reputation.db"))
+    return AnalysisContext(config=cfg, org_profile=org, intel=intel, behavioral=behavioral,
+                           ti=ti, evidence=evidence, reputation=reputation, mailbox_id="web")
 
 
 def _store(cfg: Config) -> ReportStore:

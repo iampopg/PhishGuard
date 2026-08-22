@@ -12,6 +12,9 @@ class AnalysisContext:
     org_profile: Any = None
     intel: Any = None
     behavioral: Any = None
+    ti: Any = None
+    evidence: Any = None
+    reputation: Any = None
     mailbox_id: str = "default"
     extra: Dict[str, Any] = field(default_factory=dict)
 

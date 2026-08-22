@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 from phishguard.models import ParsedEmail
 
@@ -73,6 +73,22 @@ class BehavioralStore:
         ).fetchall()
         names = {e["sender_email"].split("@")[0].lower() for e in rows if e["sender_email"]}
         return name.strip().lower() in names
+
+    def list_baselines(self) -> List[Dict[str, object]]:
+        """Return distinct recipient -> sender_domain communication baselines."""
+        rows = self._conn.execute(
+            "SELECT recipient, sender_domain, COUNT(*) AS hits, MAX(ts) AS last_seen "
+            "FROM comms GROUP BY recipient, sender_domain ORDER BY recipient, hits DESC"
+        ).fetchall()
+        return [
+            {
+                "recipient": r["recipient"],
+                "sender_domain": r["sender_domain"],
+                "hits": r["hits"],
+                "last_seen": r["last_seen"],
+            }
+            for r in rows
+        ]
 
     def close(self) -> None:
         self._conn.close()

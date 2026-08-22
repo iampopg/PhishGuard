@@ -11,7 +11,11 @@ from phishguard.engines.header_auth import analyze as header_auth_analyze
 from phishguard.engines.org_context import analyze as org_context_analyze
 from phishguard.engines.scoring import aggregate, recommended_actions
 from phishguard.engines.url_scanner import analyze as url_analyze
+from phishguard.engines.url_deep_scanner import analyze as url_deep_analyze
+from phishguard.engines.calendar import analyze as calendar_analyze
+from phishguard.engines.qr_scanner import analyze as qr_analyze
 from phishguard.engines.behavioral import analyze as behavioral_analyze
+from phishguard.engines.trust import analyze as trust_analyze
 from phishguard.engines.base import AnalysisContext
 from phishguard.models import ParsedEmail, Report, new_report_id, now_iso
 from phishguard.rules import DEFAULT_RULES, evaluate_rules
@@ -21,9 +25,13 @@ DEFAULT_ANALYZERS: List[Callable] = [
     header_analysis_analyze,
     domain_analyze,
     org_context_analyze,
+    trust_analyze,
     url_analyze,
+    url_deep_analyze,
     content_analyze,
     attachment_analyze,
+    calendar_analyze,
+    qr_analyze,
     sandbox_analyze,
     behavioral_analyze,
 ]
@@ -42,6 +50,7 @@ def analyze_email(
     ctx: AnalysisContext,
     analyzers: Optional[List[Callable]] = None,
     rules: Optional[List] = None,
+    raw: Optional[bytes] = None,
 ) -> Report:
     analyzers = analyzers or DEFAULT_ANALYZERS
     rules = rules if rules is not None else DEFAULT_RULES
@@ -79,6 +88,20 @@ def analyze_email(
 
     actions = list(recommended_actions(verdict)) + evaluate_rules(report, rules)
     report.recommended_actions = list(dict.fromkeys(actions))
+
+    if ctx.evidence is not None and getattr(ctx.config, "evidence_enabled", True):
+        try:
+            ctx.evidence.store_artifacts(
+                report.report_id,
+                raw=raw,
+                headers=parsed.raw_headers,
+                body_text=parsed.body_text,
+                body_html=parsed.body_html,
+                report=report.to_dict(),
+            )
+        except Exception:
+            pass
+
     return report
 
 

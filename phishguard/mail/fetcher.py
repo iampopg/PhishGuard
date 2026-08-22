@@ -64,3 +64,25 @@ class MailFetcher:
             if mark_read:
                 self._conn.uid("STORE", uid, "+FLAGS", "\\Seen")
         return out
+
+    def uidvalidity(self) -> str:
+        """Return the current mailbox UIDVALIDITY, or empty string if unavailable."""
+        try:
+            if not self._conn:
+                self.connect()
+            typ, data = self._conn.select(self.config.imap_mailbox or "INBOX")
+            if typ == "OK" and data:
+                return str(data[0].decode() if isinstance(data[0], bytes) else data[0])
+        except Exception:
+            return ""
+        return ""
+
+    def fetch_unseen_uids(self, limit: int = 50) -> List[str]:
+        """Return just the UNSEEN UIDs (no body fetch) for dedup filtering."""
+        if not self._conn:
+            self.connect()
+        typ, data = self._conn.search(None, "UNSEEN")
+        if typ != "OK":
+            return []
+        return [u.decode() if isinstance(u, bytes) else str(u)
+                for u in (data[0].split()[-limit:] if data and data[0] else [])]

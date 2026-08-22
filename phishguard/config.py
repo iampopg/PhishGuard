@@ -34,7 +34,9 @@ class Config:
 
     monitor_enabled: bool = False
     monitor_interval: int = 60
-
+    monitor_batch: int = 50
+    monitor_alert_webhook: str = ""
+    monitor_backoff_max: int = 600
     behavioral_enabled: bool = False
     behavioral_baseline_days: int = 30
 
@@ -69,6 +71,31 @@ class Config:
 
     trusted_domains: List[str] = field(default_factory=list)
     log_level: str = "INFO"
+
+    urlscan_api_key: str = ""
+    urlscan_enabled: bool = False
+
+    shodan_api_key: str = ""
+    shodan_enabled: bool = False
+
+    otx_api_key: str = ""
+    otx_enabled: bool = False
+
+    misp_url: str = ""
+    misp_api_key: str = ""
+    misp_enabled: bool = False
+    misp_verify_ssl: bool = True
+
+    abuseipdb_api_key: str = ""
+    abuseipdb_enabled: bool = False
+
+    url_deep_scan_enabled: bool = True
+    url_deep_screenshot_enabled: bool = False
+    url_deep_max_redirects: int = 5
+    url_deep_timeout: int = 15
+
+    evidence_enabled: bool = True
+    ti_cache_ttl: int = 3600
 
     @classmethod
     def load(cls, environ: Optional[dict] = None) -> "Config":
@@ -112,6 +139,9 @@ class Config:
             sandbox_url=env.get("PG_SANDBOX_URL", ""),
             monitor_enabled=flag("PG_MONITOR_ENABLED", False),
             monitor_interval=integer("PG_MONITOR_INTERVAL", 60),
+            monitor_batch=integer("PG_MONITOR_BATCH", 50),
+            monitor_alert_webhook=env.get("PG_MONITOR_ALERT_WEBHOOK", ""),
+            monitor_backoff_max=integer("PG_MONITOR_BACKOFF_MAX", 600),
             behavioral_enabled=flag("PG_BEHAVIORAL_ENABLED", False),
             behavioral_baseline_days=integer("PG_BEHAVIORAL_BASELINE_DAYS", 30),
             org_profile_path=env.get("PG_ORG_PROFILE_PATH", ""),
@@ -138,6 +168,24 @@ class Config:
             dns_checks_enabled=flag("PG_DNS_CHECKS_ENABLED", False),
             trusted_domains=csv("PG_TRUSTED_DOMAINS"),
             log_level=env.get("PG_LOG_LEVEL", "INFO").upper(),
+            urlscan_api_key=env.get("PG_URLSCAN_API_KEY", ""),
+            urlscan_enabled=flag("PG_URLSCAN_ENABLED", False) and bool(env.get("PG_URLSCAN_API_KEY")),
+            shodan_api_key=env.get("PG_SHODAN_API_KEY", ""),
+            shodan_enabled=flag("PG_SHODAN_ENABLED", False) and bool(env.get("PG_SHODAN_API_KEY")),
+            otx_api_key=env.get("PG_OTX_API_KEY", ""),
+            otx_enabled=flag("PG_OTX_ENABLED", False) and bool(env.get("PG_OTX_API_KEY")),
+            misp_url=env.get("PG_MISP_URL", ""),
+            misp_api_key=env.get("PG_MISP_API_KEY", ""),
+            misp_enabled=flag("PG_MISP_ENABLED", False) and bool(env.get("PG_MISP_API_KEY") and env.get("PG_MISP_URL")),
+            misp_verify_ssl=flag("PG_MISP_VERIFY_SSL", True),
+            abuseipdb_api_key=env.get("PG_ABUSEIPDB_API_KEY", ""),
+            abuseipdb_enabled=flag("PG_ABUSEIPDB_ENABLED", False) and bool(env.get("PG_ABUSEIPDB_API_KEY")),
+            url_deep_scan_enabled=flag("PG_URL_DEEP_SCAN_ENABLED", True),
+            url_deep_screenshot_enabled=flag("PG_URL_DEEP_SCREENSHOT_ENABLED", False),
+            url_deep_max_redirects=integer("PG_URL_DEEP_MAX_REDIRECTS", 5),
+            url_deep_timeout=integer("PG_URL_DEEP_TIMEOUT", 15),
+            evidence_enabled=flag("PG_EVIDENCE_ENABLED", True),
+            ti_cache_ttl=integer("PG_TI_CACHE_TTL", 3600),
         )
 
     @property

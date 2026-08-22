@@ -4,6 +4,8 @@ import os
 import json
 import threading
 import time
+from datetime import datetime
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,8 +22,11 @@ from phishguard.config_store import (current_config, load_env_dict, reload_env,
                                      update_env)
 from phishguard.export import ExportManager
 from phishguard.feeds import FeedManager
+from phishguard.forensics.ioc import extract_iocs
+from phishguard.forensics.takedown import build_takedown_package
 from phishguard.intel import IntelligenceHub
 from phishguard.mail.fetcher import MailFetcher
+from phishguard.mail.monitor_store import MonitorStore
 from phishguard.mail.parser import parse_message
 from phishguard.models import AuthResult, ParsedEmail
 from phishguard.org_profile import OrgProfile
@@ -41,8 +46,8 @@ def _store(cfg: Config) -> ReportStore:
     return ReportStore(str(Path(cfg.report_dir) / "phishguard.db"))
 
 
-def _persist(ctx, parsed: ParsedEmail, report) -> None:
-    _store(ctx.config).save_report(report)
+def _persist(ctx, parsed: ParsedEmail, report, raw: bytes = None) -> None:
+    _store(ctx.config).save_report(report, raw=raw)
     if ctx.behavioral is not None:
         ctx.behavioral.record(parsed)
     ExportManager(ctx.config).export(report)
@@ -72,11 +77,14 @@ BOOL_KEYS = {
     "PG_GSB_ENABLED", "PG_CLAMAV_ENABLED", "PG_SANDBOX_ENABLED", "PG_MONITOR_ENABLED",
     "PG_BEHAVIORAL_ENABLED", "PG_REMEDIATION_ENABLED", "PG_EXPORT_ENABLED",
     "PG_EXPORT_CEF", "PG_DNS_CHECKS_ENABLED",
+    "PG_URLSCAN_ENABLED", "PG_SHODAN_ENABLED", "PG_OTX_ENABLED", "PG_MISP_ENABLED",
+    "PG_ABUSEIPDB_ENABLED", "PG_URL_DEEP_SCREENSHOT_ENABLED",
 }
 INT_KEYS = {
     "PG_IMAP_PORT", "PG_IMAP_TIMEOUT", "PG_CLAMAV_PORT", "PG_MONITOR_INTERVAL",
     "PG_BEHAVIORAL_BASELINE_DAYS", "PG_THRESHOLD_SUSPICIOUS", "PG_THRESHOLD_PHISHING",
-    "PG_THRESHOLD_MALICIOUS", "PG_WEB_PORT",
+    "PG_THRESHOLD_MALICIOUS", "PG_WEB_PORT", "PG_URL_DEEP_MAX_REDIRECTS",
+    "PG_URL_DEEP_TIMEOUT", "PG_TI_CACHE_TTL",
 }
 STRING_KEYS = {
     "PG_IMAP_SERVER", "PG_IMAP_USERNAME", "PG_IMAP_PASSWORD", "PG_IMAP_MAILBOX",
@@ -87,6 +95,8 @@ STRING_KEYS = {
     "PG_M365_CLIENT_SECRET", "PG_GMAIL_SA_JSON", "PG_EXPORT_SYSLOG_ADDR",
     "PG_EXPORT_WEBHOOK_URL", "PG_EXPORT_MIN_SEVERITY", "PG_TRUSTED_DOMAINS",
     "PG_LOG_LEVEL",
+    "PG_URLSCAN_API_KEY", "PG_SHODAN_API_KEY", "PG_OTX_API_KEY",
+    "PG_MISP_URL", "PG_MISP_API_KEY", "PG_ABUSEIPDB_API_KEY",
 }
 
 
@@ -97,8 +107,38 @@ def create_api() -> FastAPI:
         allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
     )
     WEB_OUT = Path(__file__).resolve().parent.parent.parent / "web" / "out"
-    app.state.feed_info = {}
-    app.state.monitor = {"running": False, "interval": 60, "thread": None}
+    app.state.monitor = {
+        "running": False, "interval": 60, "thread": None,
+        "last_scan": None, "last_new": 0, "last_error": None,
+    }
+
+    @app.on_event("startup")
+    def _maybe_autostart_monitor() -> None:
+        if current_config().monitor_enabled:
+            try:
+                set_monitor(True)
+            except Exception:
+                pass
+
+    def _feed_meta_path() -> Path:
+        return Path(current_config().report_dir) / ".feeds_meta.json"
+
+    def _load_feed_info() -> dict:
+        try:
+            p = _feed_meta_path()
+            if p.exists():
+                return json.loads(p.read_text())
+        except Exception:
+            pass
+        return {"counts": {}, "time": None}
+
+    def _save_feed_info(info: dict) -> None:
+        try:
+            _feed_meta_path().write_text(json.dumps(info, default=str))
+        except Exception:
+            pass
+
+    app.state.feed_info = _load_feed_info()
 
     def expected_token() -> str:
         try:
@@ -143,7 +183,8 @@ def create_api() -> FastAPI:
         counts = {"safe": 0, "suspicious": 0, "phishing": 0, "malicious": 0}
         for r in reports:
             counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
-        return {"monitor": app.state.monitor["running"], "total": len(reports), "counts": counts}
+        mon = {k: v for k, v in app.state.monitor.items() if k != "thread"}
+        return {"monitor": mon, "total": len(reports), "counts": counts}
 
     @app.get("/api/dashboard")
     def dashboard():
@@ -165,6 +206,28 @@ def create_api() -> FastAPI:
             counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
         shown = [r for r in all_r if r["verdict"] == verdict] if verdict else all_r
         return {"reports": [_clean_report(r) for r in shown], "counts": counts}
+
+    @app.get("/api/reports/export-pdf")
+    def reports_export_pdf(verdict: Optional[str] = None,
+                           date_from: Optional[str] = None, date_to: Optional[str] = None,
+                           disposition: Optional[str] = None):
+        from phishguard.report_pdf import generate_report_pdf
+        cfg = current_config()
+        reports = _store(cfg).list_reports(limit=10000)
+        if verdict:
+            reports = [r for r in reports if r["verdict"] == verdict]
+        if date_from:
+            reports = [r for r in reports if r["timestamp"] >= date_from]
+        if date_to:
+            reports = [r for r in reports if r["timestamp"] <= date_to + "T23:59:59"]
+        pdf = generate_report_pdf(reports, output_path=None, verdict_filter=verdict,
+                                  date_from=date_from, date_to=date_to)
+        from fastapi.responses import Response
+        fname = f"phishguard-report-{datetime.now().strftime('%Y%m%d-%H%M%S')}.pdf"
+        # disposition=inline previews in the browser; attachment forces a download
+        disp = "inline" if disposition == "inline" else "attachment"
+        return Response(pdf, media_type="application/pdf",
+                        headers={"Content-Disposition": f"{disp}; filename={fname}"})
 
     @app.get("/api/report/{report_id}")
     def report_detail(report_id: str):
@@ -194,6 +257,7 @@ def create_api() -> FastAPI:
                                  reply_to=None, return_path=None, body_text=text, body_html="",
                                  urls=extract_urls(text), attachments=[], auth=AuthResult(),
                                  authentication_results={}, raw_headers={})
+            data = None
         elif url:
             parsed = ParsedEmail(message_id=None, subject=None, from_header="", to_header="",
                                  date_header="", sender_name="", sender_email="", sender_domain="",
@@ -201,9 +265,10 @@ def create_api() -> FastAPI:
                                  reply_to=None, return_path=None, body_text=url, body_html="",
                                  urls=[url], attachments=[], auth=AuthResult(),
                                  authentication_results={}, raw_headers={})
+            data = None
         else:
             raise HTTPException(status_code=400, detail="Provide eml, text or url")
-        report = analyze_email(parsed, ctx)
+        report = analyze_email(parsed, ctx, raw=data)
         _persist(ctx, parsed, report)
         return report.to_dict()
 
@@ -244,26 +309,93 @@ def create_api() -> FastAPI:
         out = []
         for uid, raw in items:
             parsed = parse_message(raw)
-            report = analyze_email(parsed, ctx)
-            _persist(ctx, parsed, report)
+            report = analyze_email(parsed, ctx, raw=raw)
+            _persist(ctx, parsed, report, raw=raw)
             out.append(report.to_dict())
         fetcher.disconnect()
         return {"scanned": len(out), "results": out}
 
+    def _fetch_uid(fetcher: MailFetcher, uid: str):
+        """Fetch a single message's RFC822 bytes by UID. Returns (uid, bytes) or None."""
+        try:
+            typ, msg_data = fetcher._conn.uid("FETCH", uid, "(RFC822)")
+            if typ != "OK" or not msg_data or not msg_data[0]:
+                return None
+            raw = msg_data[0][1]
+            if isinstance(raw, bytes):
+                return (uid, raw)
+        except Exception:
+            return None
+        return None
+
+
+    def _alert(ctx, report, uid: str) -> None:
+        """Send a monitor threat notification to a configured webhook (best-effort)."""
+        url = getattr(ctx.config, "monitor_alert_webhook", "")
+        if not url:
+            return
+        subject = (report.source.get("subject") if isinstance(report.source, dict) else None) or "(no subject)"
+        payload = {
+            "source": "phishguard-monitor",
+            "verdict": report.verdict.value,
+            "risk_score": report.risk_score,
+            "subject": subject,
+            "sender": report.sender,
+            "report_id": report.report_id,
+            "uid": uid,
+        }
+        try:
+            requests.post(url, json=payload, timeout=10)
+        except Exception:
+            pass
+
+
     def _monitor_loop(interval: int):
         ctx = _runtime_ctx()
+        store = MonitorStore(str(Path(ctx.config.report_dir) / "monitor.db"))
+        backoff = interval
+        consecutive_failures = 0
         while app.state.monitor["running"]:
             try:
                 fetcher = MailFetcher(ctx.config)
                 fetcher.connect()
-                for uid, raw in fetcher.fetch_unseen(50):
+                validity = fetcher.uidvalidity()
+                if not validity:
+                    raise RuntimeError("could not determine mailbox UIDVALIDITY")
+                if store.update_uidvalidity(validity):
+                    store.reset()
+                batch = int(getattr(ctx.config, "monitor_batch", 50))
+                uids = fetcher.fetch_unseen_uids(batch)
+                fresh = store.unprocessed(uids, validity)
+                scanned = 0
+                for uid in fresh:
+                    if not app.state.monitor["running"]:
+                        break
+                    pair = _fetch_uid(fetcher, uid)
+                    if not pair:
+                        continue
+                    _, raw = pair
                     parsed = parse_message(raw)
-                    report = analyze_email(parsed, ctx)
-                    _persist(ctx, parsed, report)
+                    report = analyze_email(parsed, ctx, raw=raw)
+                    _persist(ctx, parsed, report, raw=raw)
+                    store.mark_processed(validity, uid, report.report_id, report.timestamp)
+                    scanned += 1
+                    if report.verdict.value in ("phishing", "malicious"):
+                        _alert(ctx, report, uid)
                 fetcher.disconnect()
-            except Exception:
-                pass
-            time.sleep(interval)
+                consecutive_failures = 0
+                backoff = interval
+                if scanned:
+                    app.state.monitor["last_scan"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    app.state.monitor["last_new"] = scanned
+            except Exception as e:
+                consecutive_failures += 1
+                app.state.monitor["last_error"] = f"{type(e).__name__}: {e}"
+            sleep_for = backoff if consecutive_failures else interval
+            time.sleep(sleep_for)
+            if consecutive_failures:
+                backoff = min(backoff * 2, int(getattr(ctx.config, "monitor_backoff_max", 600)))
+        store.close()
 
     def set_monitor(on: bool, interval: int = None) -> None:
         if on:
@@ -295,7 +427,8 @@ def create_api() -> FastAPI:
 
     @app.get("/api/mailbox")
     def mailbox_get():
-        return {"env": load_env_dict(), "monitor": app.state.monitor["running"]}
+        mon = {k: v for k, v in app.state.monitor.items() if k != "thread"}
+        return {"env": load_env_dict(), "monitor": mon}
 
     # ---------- feeds ----------
     @app.get("/api/feeds")
@@ -308,6 +441,7 @@ def create_api() -> FastAPI:
         fm = FeedManager()
         res = fm.update_all(ctx.intel)
         app.state.feed_info = {"counts": res, "time": time.strftime("%Y-%m-%d %H:%M:%S")}
+        _save_feed_info(app.state.feed_info)
         return app.state.feed_info
 
     # ---------- org ----------
@@ -336,6 +470,22 @@ def create_api() -> FastAPI:
         org.save(path)
         reload_env()
         return {"ok": True, "path": path}
+
+    @app.post("/api/report/{report_id}/reanalyze")
+    def report_reanalyze(report_id: str):
+        cfg = current_config()
+        store = _store(cfg)
+        raw = store.get_raw(report_id)
+        if not raw:
+            raise HTTPException(status_code=404, detail="No raw email stored for this report")
+        from phishguard.mail.parser import parse_message
+        parsed = parse_message(raw)
+        ctx = _runtime_ctx()
+        report = analyze_email(parsed, ctx, raw=raw)
+        store.update_report(report)
+        ExportManager(cfg).export(report)
+        RemediationManager(cfg).apply(report)
+        return {"ok": True, "verdict": report.verdict.value, "risk_score": report.risk_score}
 
     # ---------- rules ----------
     @app.get("/api/rules")
@@ -516,6 +666,118 @@ def create_api() -> FastAPI:
         bs = BehavioralStore(Path(cfg.report_dir) / "behavioral.db")
         return {"enabled": True, "baselines": bs.list_baselines()}
 
+    # ---------- sender reputation ----------
+    @app.get("/api/sender/reputation")
+    def sender_reputation_get(sender: str = ""):
+        ctx = _runtime_ctx()
+        if not sender:
+            return {"stats": ctx.reputation.stats(), "safe": ctx.reputation.all_safe()[:200]}
+        return {"sender": sender, "reputation": ctx.reputation.reputation_of(sender)}
+
+    @app.post("/api/sender/trust")
+    def sender_trust(sender: str = Form(""), note: str = Form("")):
+        ctx = _runtime_ctx()
+        ctx.reputation.trust(sender, note)
+        return {"ok": True, "sender": ctx.reputation._key(sender), "reputation": "safe"}
+
+    @app.post("/api/sender/mark-bad")
+    def sender_mark_bad(sender: str = Form(""), note: str = Form("")):
+        ctx = _runtime_ctx()
+        ctx.reputation.mark_bad(sender, note)
+        return {"ok": True, "sender": ctx.reputation._key(sender), "reputation": "bad"}
+
+    @app.delete("/api/sender/reputation")
+    def sender_reputation_delete(sender: str = Form()):
+        ctx = _runtime_ctx()
+        ctx.reputation.remove(sender)
+        return {"ok": True}
+
+    # ---------- forensics ----------
+    @app.get("/api/forensics/ioc/{report_id}")
+    def forensics_ioc(report_id: str):
+        r = _store(current_config()).get_report(report_id)
+        if not r:
+            raise HTTPException(status_code=404, detail="Not found")
+        iocs = extract_iocs(r)
+        return {"report_id": report_id, "iocs": iocs.to_dict()}
+
+    @app.post("/api/forensics/enrich")
+    async def forensics_enrich(request: Request):
+        ctx = _runtime_ctx()
+        if ctx.ti is None:
+            return {"ok": False, "message": "No threat-intel providers enabled. Set a provider API key in Settings."}
+        ct = request.headers.get("content-type", "")
+        iocs = None
+        if "application/json" in ct:
+            body = await request.json()
+            report_id = body.get("report_id")
+            if report_id:
+                r = _store(ctx.config).get_report(report_id)
+                if not r:
+                    raise HTTPException(status_code=404, detail="Report not found")
+                iocs = extract_iocs(r)
+            elif body.get("text"):
+                from phishguard.util.text import extract_urls
+                from phishguard.models import ParsedEmail, AuthResult
+                text = body["text"]
+                parsed = ParsedEmail(message_id=None, subject=None, from_header="", to_header="",
+                                     date_header="", sender_name="", sender_email="", sender_domain="",
+                                     receiver_email="", receiver_domain="", envelope_from=None,
+                                     reply_to=None, return_path=None, body_text=text, body_html="",
+                                     urls=extract_urls(text), attachments=[], auth=AuthResult(),
+                                     authentication_results={}, raw_headers={})
+                iocs = extract_iocs(parsed.to_dict() if hasattr(parsed, "to_dict") else {})
+        else:
+            data = await request.body()
+            if data:
+                try:
+                    r = json.loads(data)
+                    iocs = extract_iocs(r)
+                except Exception:
+                    iocs = None
+        if iocs is None:
+            return {"ok": False, "message": "Provide report_id, JSON report, or text."}
+        enrichment = ctx.ti.enrich(iocs)
+        return {"ok": True, "report_id": request.query_params.get("report_id"), **enrichment}
+
+    @app.get("/api/forensics/evidence/{report_id}")
+    def forensics_evidence_list(report_id: str):
+        ctx = _runtime_ctx()
+        if ctx.evidence is None:
+            return {"enabled": False}
+        return {"report_id": report_id, "artifacts": ctx.evidence.list_artifacts(report_id)}
+
+    @app.get("/api/forensics/evidence/{report_id}/{name}")
+    def forensics_evidence_get(report_id: str, name: str):
+        ctx = _runtime_ctx()
+        if ctx.evidence is None:
+            raise HTTPException(status_code=404, detail="Evidence disabled")
+        path = ctx.evidence.get_artifact(report_id, name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Artifact not found")
+        return FileResponse(path)
+
+    @app.get("/api/forensics/takedown/{report_id}")
+    def forensics_takedown(report_id: str):
+        r = _store(current_config()).get_report(report_id)
+        if not r:
+            raise HTTPException(status_code=404, detail="Not found")
+        iocs = extract_iocs(r)
+        enrichment = None
+        ctx = _runtime_ctx()
+        if ctx.ti is not None:
+            enrichment = ctx.ti.enrich(iocs)
+        pkg = build_takedown_package(r, iocs.to_dict(), enrichment)
+        from fastapi.responses import Response
+        return Response(pkg, media_type="application/zip",
+                        headers={"Content-Disposition": f"attachment; filename={report_id}-takedown.zip"})
+
+    @app.get("/api/ti/status")
+    def ti_status():
+        ctx = _runtime_ctx()
+        names = ctx.ti.enabled_names if ctx.ti is not None else []
+        return {"providers": names, "enabled": bool(names)}
+
     # ---------- SPA fallback ----------
     @app.get("/{full_path:path}")
     async def spa(full_path: str):
@@ -564,6 +826,12 @@ def _config_public(cfg: Config) -> dict:
         "remediation_enabled": cfg.remediation_enabled, "export_enabled": cfg.export_enabled,
         "export_cef": cfg.export_use_cef, "export_min_severity": cfg.export_min_severity,
         "log_level": cfg.log_level,
+        "urlscan_enabled": cfg.urlscan_enabled, "shodan_enabled": cfg.shodan_enabled,
+        "otx_enabled": cfg.otx_enabled, "misp_enabled": cfg.misp_enabled,
+        "abuseipdb_enabled": cfg.abuseipdb_enabled,
+        "url_deep_scan_enabled": cfg.url_deep_scan_enabled,
+        "url_deep_screenshot_enabled": cfg.url_deep_screenshot_enabled,
+        "evidence_enabled": cfg.evidence_enabled,
     }
 
 

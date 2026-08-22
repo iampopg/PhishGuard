@@ -18,6 +18,10 @@ from phishguard.report_store import ReportStore
 from phishguard.behavioral_store import BehavioralStore
 from phishguard.export import ExportManager
 from phishguard.remediation import RemediationManager
+from phishguard.forensics.evidence import EvidenceStore
+from phishguard.reputation import SenderReputationStore
+from phishguard.ti import ThreatIntelligenceManager
+from datetime import datetime
 
 
 def _load_config() -> Config:
@@ -37,12 +41,19 @@ def _load_ctx(args) -> AnalysisContext:
     ctx = AnalysisContext(config=config, org_profile=org, intel=intel, behavioral=None, mailbox_id="cli")
     if config.behavioral_enabled:
         ctx.behavioral = BehavioralStore(str(Path(args.cache_dir) / "behavioral.db"))
+    if config.evidence_enabled:
+        ctx.evidence = EvidenceStore(str(Path(config.report_dir)))
+    if getattr(config, "urlscan_enabled", False) or getattr(config, "shodan_enabled", False) or \
+       getattr(config, "otx_enabled", False) or getattr(config, "misp_enabled", False) or \
+       getattr(config, "abuseipdb_enabled", False):
+        ctx.ti = ThreatIntelligenceManager(config)
+    ctx.reputation = SenderReputationStore(str(Path(args.cache_dir) / "reputation.db"))
     return ctx
 
 
-def _persist(ctx: AnalysisContext, parsed: ParsedEmail, report) -> None:
+def _persist(ctx: AnalysisContext, parsed: ParsedEmail, report, raw: bytes = None) -> None:
     store = ReportStore(str(Path(ctx.config.report_dir) / "phishguard.db"))
-    store.save_report(report)
+    store.save_report(report, raw=raw)
     if ctx.behavioral is not None:
         ctx.behavioral.record(parsed)
     ExportManager(ctx.config).export(report)
@@ -70,9 +81,9 @@ def cmd_scan_eml(args, ctx: AnalysisContext) -> int:
     raw = Path(args.eml).read_bytes()
     parsed = parse_message(raw)
     from phishguard.pipeline import analyze_email
-    report = analyze_email(parsed, ctx)
+    report = analyze_email(parsed, ctx, raw=raw)
     print(_report_json(report))
-    _persist(ctx, parsed, report)
+    _persist(ctx, parsed, report, raw=raw)
     return 0
 
 
@@ -110,8 +121,8 @@ def cmd_scan_mailbox(args, ctx: AnalysisContext) -> int:
     for n, (uid, raw) in enumerate(items, 1):
         print(f"[scan-mailbox] {n}/{len(items)} uid={uid}", file=sys.stderr, flush=True)
         parsed = parse_message(raw)
-        report = analyze_email(parsed, ctx)
-        _persist(ctx, parsed, report)
+        report = analyze_email(parsed, ctx, raw=raw)
+        _persist(ctx, parsed, report, raw=raw)
         out.append(report.to_dict())
     fetcher.disconnect()
     print(json.dumps(out, indent=2, default=str))
@@ -173,6 +184,78 @@ def cmd_feeds(args, ctx: AnalysisContext) -> int:
     return 0
 
 
+def cmd_export_pdf(args, ctx: AnalysisContext) -> int:
+    from phishguard.report_pdf import generate_report_pdf
+    store = ReportStore(str(Path(ctx.config.report_dir) / "phishguard.db"))
+    reports = store.list_reports(limit=10000)
+    if args.verdict:
+        reports = [r for r in reports if r["verdict"] == args.verdict]
+    if args.from_date:
+        reports = [r for r in reports if r["timestamp"] >= args.from_date]
+    if args.to_date:
+        reports = [r for r in reports if r["timestamp"] <= args.to_date + "T23:59:59"]
+    out = Path(args.output) if args.output else Path(f"phishguard-report-{datetime.now().strftime('%Y%m%d-%H%M%S')}.pdf")
+    generate_report_pdf(reports, str(out), verdict_filter=args.verdict or None,
+                        date_from=args.from_date, date_to=args.to_date)
+    print(f"Wrote PDF report ({len(reports)} analyses) to {out}")
+    return 0
+
+
+def cmd_forensics_extract(args, ctx: AnalysisContext) -> int:
+    from phishguard.forensics.ioc import extract_iocs
+    report = _load_report(ctx, args)
+    if report is None:
+        return 1
+    print(json.dumps(extract_iocs(report).to_dict(), indent=2, default=str))
+    return 0
+
+
+def cmd_forensics_enrich(args, ctx: AnalysisContext) -> int:
+    from phishguard.forensics.ioc import extract_iocs
+    if ctx.ti is None:
+        print("No threat-intel providers enabled. Set a provider API key.", file=sys.stderr)
+        return 1
+    report = _load_report(ctx, args)
+    if report is None:
+        return 1
+    iocs = extract_iocs(report)
+    print(json.dumps(ctx.ti.enrich(iocs), indent=2, default=str))
+    return 0
+
+
+def cmd_forensics_takedown(args, ctx: AnalysisContext) -> int:
+    from phishguard.forensics.ioc import extract_iocs
+    from phishguard.forensics.takedown import build_takedown_package
+    report = _load_report(ctx, args)
+    if report is None:
+        return 1
+    iocs = extract_iocs(report)
+    enrichment = ctx.ti.enrich(iocs) if ctx.ti is not None else None
+    out = Path(args.output) if args.output else Path(f"{args.report_id}-takedown.zip")
+    out.write_bytes(build_takedown_package(report, iocs.to_dict(), enrichment))
+    print(f"Wrote takedown package to {out}")
+    return 0
+
+
+def cmd_ti_status(args, ctx: AnalysisContext) -> int:
+    names = ctx.ti.enabled_names if ctx.ti is not None else []
+    print(json.dumps({"providers": names, "enabled": bool(names)}, indent=2))
+    return 0
+
+
+def _load_report(ctx: AnalysisContext, args) -> "object":
+    if getattr(args, "eml", None):
+        raw = Path(args.eml).read_bytes()
+        parsed = parse_message(raw)
+        from phishguard.pipeline import analyze_email
+        return analyze_email(parsed, ctx, raw=raw).to_dict()
+    store = ReportStore(str(Path(ctx.config.report_dir) / "phishguard.db"))
+    r = store.get_report(args.report_id)
+    if not r:
+        print(f"Report not found: {args.report_id}", file=sys.stderr)
+    return r
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="phishguard", description="PhishGuard phishing detection engine")
     p.add_argument("--org-profile", default="org_profile.json")
@@ -210,6 +293,32 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("feeds", help="Pull free threat-intel feeds into the local cache")
     s.set_defaults(func=cmd_feeds)
+
+    f = sub.add_parser("forensics", help="Forensic observables, enrichment and takedown")
+    fs = f.add_subparsers(dest="forensics_command", required=True)
+    fe = fs.add_parser("extract", help="Extract IOCs from a report or an .eml file")
+    fe.add_argument("--report-id", dest="report_id", default="")
+    fe.add_argument("--eml", default="")
+    fe.set_defaults(func=cmd_forensics_extract)
+    fn = fs.add_parser("enrich", help="Extract IOCs and enrich across threat-intel providers")
+    fn.add_argument("--report-id", dest="report_id", default="")
+    fn.add_argument("--eml", default="")
+    fn.set_defaults(func=cmd_forensics_enrich)
+    ft = fs.add_parser("takedown", help="Build a takedown/intel package for a report")
+    ft.add_argument("report_id")
+    ft.add_argument("--output", default="")
+    ft.set_defaults(func=cmd_forensics_takedown)
+
+    s = sub.add_parser("ti", help="Threat-intel provider status")
+    s.set_defaults(func=cmd_ti_status)
+
+    s = sub.add_parser("export-pdf", help="Export a filtered PDF report of all analyses")
+    s.add_argument("--verdict", default="", help="Filter by verdict (safe/suspicious/phishing/malicious)")
+    s.add_argument("--from", dest="from_date", default="", help="Start date (YYYY-MM-DD)")
+    s.add_argument("--to", dest="to_date", default="", help="End date (YYYY-MM-DD)")
+    s.add_argument("--output", default="", help="Output PDF path")
+    s.set_defaults(func=cmd_export_pdf)
+
     return p
 
 
